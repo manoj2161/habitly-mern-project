@@ -15,7 +15,7 @@ export const registerUser = (req, res) => {
   ) {
     return res.status(400).json({
       isSuccess: false,
-      errorMessage: "Invalid data entry",
+      errorMessage: "Invalid data fields",
       errorCode: 400,
     });
   }
