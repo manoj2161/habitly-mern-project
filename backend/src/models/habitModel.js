@@ -1,16 +1,15 @@
 import mongoose from "mongoose";
-
-const userSchema = new mongoose.Schema({
+const habitSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  },
   name: {
     type: String,
     required: true,
   },
-  email: {
-    type: String,
-    required: true,
-    unique: true,
-  },
-  password: {
+  color: {
     type: String,
     required: true,
   },
@@ -19,4 +18,5 @@ const userSchema = new mongoose.Schema({
     default: Date.now,
   },
 });
-export const User = mongoose.model("users", userSchema);
+
+export const Habit = mongoose.model("habits", habitSchema);
