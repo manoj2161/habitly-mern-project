@@ -12,6 +12,9 @@ app.use(express.json());
 connectDb();
 const PORT = process.env.PORT;
 const APP_NAME = process.env.APP_NAME;
+app.get("/", (req, res) => {
+  res.send("server is running");
+});
 app.use("/api/auth/user/", userRouter);
 app.use("/api/auth/user/", habitRouter);
 app.listen(PORT, () => {
