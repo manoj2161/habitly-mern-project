@@ -128,8 +128,8 @@ export const SettingsPage = () => {
 
     if (!confirmed) return;
 
-    localStorage.removeItem("currentUser");
-    sessionStorage.removeItem("currentUser");
+    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
 
     navigate("/", { replace: true });
   }

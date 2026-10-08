@@ -13,8 +13,7 @@ import { ForgotPassword } from "./components/ForgotPassword";
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     return Boolean(
-      localStorage.getItem("currentUser") ||
-      sessionStorage.getItem("currentUser"),
+      localStorage.getItem("token") || sessionStorage.getItem("token"),
     );
   });
 

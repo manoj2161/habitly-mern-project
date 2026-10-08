@@ -2,13 +2,13 @@ import girlImage from "../assets/girlImage.png";
 import { useNavigate } from "react-router-dom";
 import { Mail, Lock, Eye, EyeClosed } from "lucide-react";
 import { useState } from "react";
-
+import axios from "axios";
+import { login } from "../api/endpoints";
 export const Login = ({ isLoggedIn, setIsLoggedIn }) => {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
     rememberMe: false,
-    isLoggedIn,
   });
 
   const [errors, setErrors] = useState({});
@@ -30,43 +30,38 @@ export const Login = ({ isLoggedIn, setIsLoggedIn }) => {
     }));
   }
 
-  function handleSignin(e) {
+  async function handleSignin(e) {
     e.preventDefault();
-
     const newErrors = {};
-    const data = JSON.parse(localStorage.getItem("users")) || [];
-
-    const existingUser = data.find(
-      (user) => user.email === formData.email.trim().toLowerCase(),
-    );
-
     if (!formData.email.trim()) {
       newErrors.email = "Email is required";
-    } else if (!existingUser) {
-      newErrors.email = "User does not exist";
     }
-
     if (!formData.password.trim()) {
       newErrors.password = "Password is required";
-    } else if (existingUser && existingUser.password !== formData.password) {
-      newErrors.password = "Password is incorrect";
     }
-
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
-
-    if (formData.rememberMe) {
-      localStorage.setItem("currentUser", JSON.stringify(existingUser.id));
-      sessionStorage.removeItem("currentUser");
-    } else {
-      sessionStorage.setItem("currentUser", JSON.stringify(existingUser.id));
-      localStorage.removeItem("currentUser");
+    const user = {
+      email: formData.email,
+      password: formData.password,
+    };
+    try {
+      const data = await axios.post(login, user);
+      const token = data.data.token;
+      if (formData.rememberMe) {
+        localStorage.setItem("token", token);
+      } else {
+        sessionStorage.setItem("token", token);
+      }
+      setIsLoggedIn(true);
+      navigate("/dashboard");
+    } catch (error) {
+      newErrors.password = error.response.data.message;
+      setErrors(newErrors);
+      return;
     }
-
-    setIsLoggedIn(true);
-    navigate("/dashboard");
   }
 
   return (

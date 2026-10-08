@@ -2,7 +2,8 @@ import girlImage from "../assets/girlImage.png";
 import { useNavigate } from "react-router-dom";
 import { Mail, Lock, EyeClosed, UserRound, Eye } from "lucide-react";
 import { useState } from "react";
-
+import axios from "axios";
+import { register } from "../api/endpoints";
 export const SignUp = () => {
   const [formData, setFormData] = useState({
     name: "",
@@ -31,16 +32,9 @@ export const SignUp = () => {
     }));
   }
 
-  function handleSignup(e) {
+  async function handleSignup(e) {
     e.preventDefault();
-const url = 
     const newErrors = {};
-    const userData = JSON.parse(localStorage.getItem("users")) || [];
-
-    const existingUser = userData.find(
-      (user) => user.email.toLowerCase() === formData.email.toLowerCase(),
-    );
-
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (!formData.name.trim()) {
@@ -51,20 +45,20 @@ const url =
       newErrors.email = "Email is required";
     } else if (!emailRegex.test(formData.email)) {
       newErrors.email = "Please enter a valid email";
-    } else if (existingUser) {
-      newErrors.email = "User already exists";
     }
-
     if (!formData.password.trim()) {
       newErrors.password = "Password is required";
-    } else if (formData.password.length < 6) {
-      newErrors.password = "Password must contain at least 6 characters";
-    }
+    } else {
+      const passwordRegex =
+        /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,64}$/;
 
+      if (!passwordRegex.test(formData.password)) {
+        newErrors.password =
+          "Password must be 8–64 characters and contain uppercase, lowercase, number, and special character";
+      }
+    }
     if (!formData.cpassword.trim()) {
       newErrors.cpassword = "Confirm Password is required";
-    } else if (formData.cpassword.length < 6) {
-      newErrors.cpassword = "Password must contain at least 6 characters";
     } else if (formData.password !== formData.cpassword) {
       newErrors.cpassword = "Password does not match";
     }
@@ -73,21 +67,20 @@ const url =
       setErrors(newErrors);
       return;
     }
-
     const newUser = {
-      id: crypto.randomUUID(),
       name: formData.name.trim(),
       email: formData.email.trim().toLowerCase(),
       password: formData.password,
-      cpassword: formData.cpassword,
-      habits: [],
     };
-
-    userData.push(newUser);
-
-    localStorage.setItem("users", JSON.stringify(userData));
-
-    navigate("/");
+    try {
+      const userData = await axios.post(register, newUser);
+      console.log(userData);
+      navigate("/");
+    } catch (error) {
+      newErrors.email = error.response.data.message;
+      setErrors(newErrors);
+      return;
+    }
   }
 
   return (

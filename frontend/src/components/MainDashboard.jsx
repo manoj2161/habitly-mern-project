@@ -7,36 +7,48 @@ import check from "../assets/check.png";
 import trophy from "../assets/trophy.png";
 import fire from "../assets/fire.png";
 import { DarkModeToggle } from "./DarkModeToggle";
+import { profile, deleteHabit, getCompletionDates } from "../api/endpoints";
+import { getToken } from "../utils/auth";
+import axios from "axios";
 export const MainDashboard = () => {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(null); // fetch the current loggedin user
   const [addHabit, setAddHabit] = useState(false);
-  const [myhabits, setMyHabits] = useState([]);
+  const [myhabits, setMyHabits] = useState([]); //fetched the current loggedin user's habits
+  const [completedDays, setcompletedDays] = useState({}); //fetched current user's logged in habits completion dates
+  const [totalCompletions, setTotalCompletions] = useState(0);
   const [editedHabit, setEditedHabit] = useState(null);
   const [search, setSearch] = useState("");
   const [checked, setChecked] = useState(false);
   const [sort, setSort] = useState("");
 
-  function getCurrentUser() {
-    const users = JSON.parse(localStorage.getItem("users")) || [];
+  const getCurrentUser = async () => {
+    const token = getToken();
+    try {
+      const user = await axios.get(profile, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-    const currentUser =
-      JSON.parse(localStorage.getItem("currentUser")) ||
-      JSON.parse(sessionStorage.getItem("currentUser"));
-
-    return users.find((user) => user.id === currentUser);
-  }
+      return user.data;
+    } catch {
+      return null;
+    }
+  };
 
   useEffect(() => {
-    const loggedUser = getCurrentUser();
-
-    if (!loggedUser) return;
-
-    setUser(loggedUser);
-    setMyHabits(loggedUser.habits || []);
+    const loggedUser = async () => {
+      const user = await getCurrentUser();
+      if (!user) return;
+      setUser(user.user);
+      setMyHabits(user.habits);
+      console.log(user.habits);
+    };
+    loggedUser();
   }, []);
 
   function getHabitStreak(habit) {
-    const dates = [...(habit.completedDays || [])].sort();
+    const dates = [...(completedDays[habit._id] || [])].sort();
 
     if (dates.length === 0) {
       return 0;
@@ -57,19 +69,17 @@ export const MainDashboard = () => {
         currentStreak = 1;
       }
 
-      if (currentStreak > largestStreak) {
-        largestStreak = currentStreak;
-      }
+      largestStreak = Math.max(largestStreak, currentStreak);
     }
 
     return largestStreak;
   }
 
-  function getLargestStreak(habits) {
+  function getLargestStreak() {
     let largestStreak = 0;
     let largestStreakHabit = null;
 
-    habits.forEach((habit) => {
+    myhabits.forEach((habit) => {
       const habitStreak = getHabitStreak(habit);
 
       if (habitStreak > largestStreak) {
@@ -83,40 +93,57 @@ export const MainDashboard = () => {
       habit: largestStreakHabit,
     };
   }
+  // get total completions
+  useEffect(() => {
+    const loadCompletionDates = async () => {
+      const token = getToken();
 
-  const result = getLargestStreak(myhabits);
+      if (!token || !myhabits?.length) return;
 
-  const totalCompletions = myhabits.reduce(
-    (acc, habit) => acc + (habit.completedDays?.length || 0),
-    0,
-  );
+      try {
+        const completionData = {};
 
-  function removeHabit(hid) {
-    const users = JSON.parse(localStorage.getItem("users")) || [];
+        for (const habit of myhabits) {
+          const response = await axios.get(
+            getCompletionDates.replace(":habitId", habit._id),
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          );
 
-    const currentUser =
-      JSON.parse(localStorage.getItem("currentUser")) ||
-      JSON.parse(sessionStorage.getItem("currentUser"));
+          completionData[habit._id] = response.data.dates || [];
+        }
+        const allDates = Object.values(completionData).flat().length;
+        setTotalCompletions(allDates);
+      } catch (error) {
+        console.log("Error loading completion dates:", error);
+      }
+    };
 
-    const loggedUser = users.find((user) => user.id === currentUser);
+    loadCompletionDates();
+  }, [myhabits, completedDays]);
 
-    if (!loggedUser) return;
-
-    const updatedHabits = loggedUser.habits.filter((habit) => habit.id !== hid);
-
-    loggedUser.habits = updatedHabits;
-
-    localStorage.setItem("users", JSON.stringify(users));
-
-    setMyHabits(updatedHabits);
-  }
+  const result = getLargestStreak();
+  const removeHabit = async (hid) => {
+    try {
+      const token = getToken();
+      await axios.delete(deleteHabit.replace(":habitId", hid), {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      setMyHabits((prev) => prev.filter((habit) => habit._id !== hid));
+    } catch {
+      return null;
+    }
+  };
 
   function handleSearch(e) {
     const searchValue = e.target.value;
 
     setSearch(searchValue);
-
-    const loggedUser = getCurrentUser();
 
     if (!loggedUser) return;
 
@@ -275,7 +302,7 @@ export const MainDashboard = () => {
                   </p>
 
                   <p className="text-sm sm:text-base truncate max-w-24 sm:max-w-32">
-                    {result.habit?.name || "No habit"}
+                    {result.habit?.name.toUpperCase() || "No habit"}
                   </p>
                 </div>
               </div>
@@ -323,6 +350,8 @@ export const MainDashboard = () => {
               setMyHabits={setMyHabits}
               search={search}
               setSearch={setSearch}
+              completedDays={completedDays}
+              setcompletedDays={setcompletedDays}
             />
           </div>
         </main>

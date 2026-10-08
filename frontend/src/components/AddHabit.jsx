@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import girlImage from "../assets/girlImage.png";
 import { Pen, X } from "lucide-react";
 import clsx from "clsx";
-
+import { createHabit, editHabit } from "../api/endpoints";
+import axios from "axios";
+import { getToken } from "../utils/auth";
 export const AddHabit = ({
   setAddHabit,
   setMyHabits,
@@ -10,11 +12,8 @@ export const AddHabit = ({
   setEditedHabit,
 }) => {
   const [habit, setHabit] = useState({
-    id: crypto.randomUUID(),
     name: "",
     color: "",
-    entryDate: new Date().toLocaleDateString("en-CA"),
-    completedDays: [],
   });
 
   const [errors, setErrors] = useState({});
@@ -45,17 +44,10 @@ export const AddHabit = ({
     });
   }
 
-  function addHabit(e) {
+  const addHabit = async (e) => {
     e.preventDefault();
 
     const newErrors = {};
-
-    const currentUser =
-      JSON.parse(localStorage.getItem("currentUser")) ||
-      JSON.parse(sessionStorage.getItem("currentUser"));
-
-    const users = JSON.parse(localStorage.getItem("users")) || [];
-
     if (!habit.name.trim()) {
       newErrors.name = "Please enter a habit";
     }
@@ -68,42 +60,58 @@ export const AddHabit = ({
       setErrors(newErrors);
       return;
     }
-
-    const existingUser = users.find((user) => user.id === currentUser);
-
-    if (!existingUser) {
+    const newHabit = {
+      name: habit.name,
+      color: habit.color,
+    };
+    try {
+      const token = getToken();
+      if (editedHabit === null) {
+        const data = await axios.post(createHabit, newHabit, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        console.log(data.data.data);
+        setEditedHabit(null);
+        setMyHabits((prev) => [...prev, data.data.data]);
+        setAddHabit(false);
+      }
+      if (editedHabit !== null) {
+        const updatedHabit = {
+          name: habit.name,
+          color: habit.color,
+        };
+        const response = await axios.put(
+          editHabit.replace(":habitId", editedHabit._id),
+          updatedHabit,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
+        console.log(response);
+        setEditedHabit(null);
+        setMyHabits((prev) =>
+          prev.map((item) =>
+            item._id === editedHabit._id
+              ? {
+                  ...item,
+                  name: response.data.data.name,
+                  color: response.data.data.color,
+                }
+              : item,
+          ),
+        );
+        setAddHabit(false);
+      }
+    } catch (error) {
+      newErrors.name = error.response.data.message;
+      setErrors(newErrors);
       return;
     }
-
-    if (editedHabit === null) {
-      existingUser.habits.push(habit);
-
-      localStorage.setItem("users", JSON.stringify(users));
-
-      setMyHabits([...existingUser.habits]);
-      setAddHabit(false);
-    }
-
-    if (editedHabit !== null) {
-      const habitID = existingUser.habits.findIndex(
-        (item) => item.id === editedHabit.id,
-      );
-
-      if (habitID === -1) return;
-
-      existingUser.habits[habitID] = {
-        ...existingUser.habits[habitID],
-        name: habit.name,
-        color: habit.color,
-      };
-
-      localStorage.setItem("users", JSON.stringify(users));
-
-      setMyHabits([...existingUser.habits]);
-      setEditedHabit(null);
-      setAddHabit(false);
-    }
-  }
+  };
 
   useEffect(() => {
     if (editedHabit) {

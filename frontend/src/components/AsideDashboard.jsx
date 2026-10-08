@@ -43,8 +43,8 @@ export const AsideDashboard = () => {
   ];
 
   function handleLogout() {
-    localStorage.removeItem("currentUser");
-    sessionStorage.removeItem("currentUser");
+    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
     navigate("/");
   }
 
