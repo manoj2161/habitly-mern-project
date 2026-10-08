@@ -1,11 +1,13 @@
 import express from "express";
 import "dotenv/config";
 import dns from "node:dns";
+import cors from "cors";
 import { connectDb } from "./src/config/db.js";
 import userRouter from "./src/routes/userRoutes.js";
 import habitRouter from "./src/routes/habitRoutes.js";
 dns.setServers(["8.8.8.8", "8.8.4.4"]);
 const app = express();
+app.use(cors());
 app.use(express.json());
 connectDb();
 const PORT = process.env.PORT;

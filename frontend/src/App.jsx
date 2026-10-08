@@ -21,7 +21,6 @@ function App() {
   return (
     <>
       <PageLoader />
-
       <Routes>
         <Route path="/" element={<Login setIsLoggedIn={setIsLoggedIn} />} />
 
