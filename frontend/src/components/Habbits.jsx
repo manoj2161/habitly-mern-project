@@ -45,20 +45,21 @@ export const Habbits = ({
       if (!token || !myhabits?.length) return;
 
       try {
-        const completionData = {};
-
-        for (const habit of myhabits) {
-          const response = await axios.get(
-            getCompletionDates.replace(":habitId", habit._id),
-            {
+        const responses = await Promise.all(
+          myhabits.map((habit) =>
+            axios.get(getCompletionDates.replace(":habitId", habit._id), {
               headers: {
                 Authorization: `Bearer ${token}`,
               },
-            },
-          );
+            }),
+          ),
+        );
 
-          completionData[habit._id] = response.data.dates || [];
-        }
+        const completionData = {};
+
+        myhabits.forEach((habit, index) => {
+          completionData[habit._id] = responses[index].data.dates || [];
+        });
 
         setcompletedDays(completionData);
       } catch (error) {
@@ -68,7 +69,6 @@ export const Habbits = ({
 
     loadCompletionDates();
   }, [myhabits]);
-
   const toggleHabitDay = async (id, date) => {
     const habits = myhabits || [];
 
