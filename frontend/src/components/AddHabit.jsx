@@ -67,14 +67,14 @@ export const AddHabit = ({
     try {
       const token = getToken();
       if (editedHabit === null) {
-        const data = await axios.post(createHabit, newHabit, {
+        const response = await axios.post(createHabit, newHabit, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         });
-        console.log(data.data.data);
+        console.log(response.data);
         setEditedHabit(null);
-        setMyHabits((prev) => [...prev, data.data.data]);
+        setMyHabits((prev) => [...prev, response.data.data]);
         setAddHabit(false);
       }
       if (editedHabit !== null) {
@@ -82,7 +82,7 @@ export const AddHabit = ({
           name: habit.name,
           color: habit.color,
         };
-        const response = await axios.put(
+        await axios.put(
           editHabit.replace(":habitId", editedHabit._id),
           updatedHabit,
           {
@@ -91,15 +91,15 @@ export const AddHabit = ({
             },
           },
         );
-        console.log(response);
+
         setEditedHabit(null);
         setMyHabits((prev) =>
           prev.map((item) =>
             item._id === editedHabit._id
               ? {
                   ...item,
-                  name: response.data.data.name,
-                  color: response.data.data.color,
+                  name: habit.name,
+                  color: habit.color,
                 }
               : item,
           ),

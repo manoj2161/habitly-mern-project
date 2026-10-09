@@ -18,6 +18,7 @@ export const MainDashboard = () => {
   const [totalCompletions, setTotalCompletions] = useState(0);
   const [editedHabit, setEditedHabit] = useState(null);
   const [search, setSearch] = useState("");
+  const [filteredHabits, setFilteredHabits] = useState([]);
   const [checked, setChecked] = useState(false);
   const [sort, setSort] = useState("");
 
@@ -42,7 +43,6 @@ export const MainDashboard = () => {
       if (!user) return;
       setUser(user.user);
       setMyHabits(user.habits);
-      console.log(user.habits);
     };
     loggedUser();
   }, []);
@@ -140,35 +140,33 @@ export const MainDashboard = () => {
     }
   };
 
-  function handleSearch(e) {
+  const handleSearch = async (e) => {
     const searchValue = e.target.value;
-
     setSearch(searchValue);
-
-    if (!loggedUser) return;
-
-    let habits = [...(loggedUser.habits || [])];
-
-    if (searchValue.trim()) {
-      habits = habits.filter((habit) =>
+    let searchedHabits = [...myhabits];
+    if (searchValue === "") {
+      return myhabits;
+    }
+    if (searchValue) {
+      searchedHabits = [...myhabits].filter((habit) =>
         habit.name.toLowerCase().includes(searchValue.toLowerCase()),
       );
     }
-
     if (checked) {
-      habits = habits.filter((habit) => getHabitStreak(habit) > 3);
+      searchedHabits = searchedHabits.filter(
+        (habit) => getHabitStreak(habit) > 3,
+      );
     }
 
     if (sort === "high") {
-      habits.sort((a, b) => getHabitStreak(b) - getHabitStreak(a));
+      searchedHabits.sort((a, b) => getHabitStreak(b) - getHabitStreak(a));
     }
 
     if (sort === "low") {
-      habits.sort((a, b) => getHabitStreak(a) - getHabitStreak(b));
+      searchedHabits.sort((a, b) => getHabitStreak(a) - getHabitStreak(b));
     }
-
-    setMyHabits(habits);
-  }
+    setFilteredHabits(searchedHabits);
+  };
 
   function handleChecked(e) {
     const isChecked = e.target.checked;
@@ -352,6 +350,7 @@ export const MainDashboard = () => {
               setSearch={setSearch}
               completedDays={completedDays}
               setcompletedDays={setcompletedDays}
+              filteredHabits={filteredHabits}
             />
           </div>
         </main>

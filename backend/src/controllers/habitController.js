@@ -24,9 +24,14 @@ export const createHabit = async (req, res) => {
     color,
   };
   await Habit.create(newHabit);
+  const createdHabit = await Habit.findOne({
+    userId: req.user.id,
+    name: cleanedName,
+  });
   res.status(201).json({
     message: "Habit created successfully",
     isSuccess: true,
+    habit: createdHabit,
   });
 };
 export const completedDays = async (req, res) => {
