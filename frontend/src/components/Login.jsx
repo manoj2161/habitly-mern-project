@@ -4,7 +4,8 @@ import { Mail, Lock, Eye, EyeClosed } from "lucide-react";
 import { useState } from "react";
 import axios from "axios";
 import { login } from "../api/endpoints";
-export const Login = ({ isLoggedIn, setIsLoggedIn }) => {
+import { notifyLogin } from "../utils/auth";
+export const Login = ({ setIsLoggedIn }) => {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -56,9 +57,10 @@ export const Login = ({ isLoggedIn, setIsLoggedIn }) => {
         sessionStorage.setItem("token", token);
       }
       setIsLoggedIn(true);
+      notifyLogin();
       navigate("/dashboard");
     } catch (error) {
-      newErrors.password = error.response.data.message;
+      newErrors.password = error.response?.data?.message || "Unable to sign in";
       setErrors(newErrors);
       return;
     }

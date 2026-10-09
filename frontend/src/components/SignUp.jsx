@@ -77,7 +77,7 @@ export const SignUp = () => {
       console.log(userData);
       navigate("/");
     } catch (error) {
-      newErrors.email = error.response.data.message;
+      newErrors.email = error.response?.data?.message || "Unable to create account";
       setErrors(newErrors);
       return;
     }

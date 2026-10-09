@@ -1,25 +1,28 @@
 import jwt from "jsonwebtoken";
 import "dotenv/config";
+
 export const emailToken = (req, res, next) => {
-  const Auth = req.headers.authorization;
-  if (!Auth) {
+  const authorization = req.headers.authorization;
+
+  if (!authorization || !authorization.startsWith("Bearer ")) {
     return res.status(401).json({
-      message: "Invalid or expired token",
+      message: "Invalid or expired reset token",
       isSuccess: false,
       errorCode: 401,
     });
   }
+
+  const token = authorization.split(" ")[1];
+
   try {
-    const token = Auth.split(" ")[1];
     const verification = jwt.verify(token, process.env.JWT_EMAIL_SECRET);
     req.userId = verification.id;
-  } catch (error) {
-    console.error(error.message);
+    next();
+  } catch {
     return res.status(401).json({
-      message: "Invalid or expired token",
+      message: "Invalid or expired reset token",
       isSuccess: false,
       errorCode: 401,
     });
   }
-  next();
 };

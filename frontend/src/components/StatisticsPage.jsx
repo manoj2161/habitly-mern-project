@@ -8,26 +8,69 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { AsideDashboard } from "./AsideDashboard";
+import { getCurrentUser } from "../utils/user";
+import { getCompletionDates } from "../api/endpoints";
+import { getToken } from "../utils/auth";
+import axios from "axios";
 
 export const StatisticsPage = () => {
   const [myhabits, setMyHabits] = useState([]);
+  const [completedDays, setCompletedDays] = useState({});
 
   useEffect(() => {
-    const users = JSON.parse(localStorage.getItem("users")) || [];
+    const loggedUser = async () => {
+      try {
+        const user = await getCurrentUser();
+        setMyHabits(user.habits || []);
+      } catch (error) {
+        console.error(error);
+      }
+    };
 
-    const currentUser =
-      JSON.parse(localStorage.getItem("currentUser")) ||
-      JSON.parse(sessionStorage.getItem("currentUser"));
-
-    const loggedUser = users.find((user) => user.id === currentUser);
-
-    if (loggedUser) {
-      setMyHabits(loggedUser.habits || []);
-    }
+    loggedUser();
   }, []);
 
+  useEffect(() => {
+    const getCompletions = async () => {
+      if (myhabits.length === 0) {
+        setCompletedDays({});
+        return;
+      }
+
+      try {
+        const token = getToken();
+
+        const responses = await Promise.all(
+          myhabits.map((habit) =>
+            axios.get(getCompletionDates.replace(":habitId", habit._id), {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }),
+          ),
+        );
+
+        const completionData = {};
+
+        myhabits.forEach((habit, index) => {
+          completionData[habit._id] = responses[index].data.dates || [];
+        });
+
+        setCompletedDays(completionData);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    getCompletions();
+  }, [myhabits]);
+
+  function getHabitDates(habit) {
+    return completedDays[habit._id] || [];
+  }
+
   function getHabitStreak(habit) {
-    const dates = [...(habit.completedDays || [])].sort();
+    const dates = [...getHabitDates(habit)].sort();
 
     if (dates.length === 0) {
       return 0;
@@ -38,6 +81,7 @@ export const StatisticsPage = () => {
 
     for (let i = 1; i < dates.length; i++) {
       const previousDate = new Date(`${dates[i - 1]}T00:00:00`);
+
       const currentDate = new Date(`${dates[i]}T00:00:00`);
 
       const difference = (currentDate - previousDate) / (1000 * 60 * 60 * 24);
@@ -48,16 +92,14 @@ export const StatisticsPage = () => {
         currentStreak = 1;
       }
 
-      if (currentStreak > largestStreak) {
-        largestStreak = currentStreak;
-      }
+      largestStreak = Math.max(largestStreak, currentStreak);
     }
 
     return largestStreak;
   }
 
   function getCurrentStreak(habit) {
-    const dates = [...(habit.completedDays || [])].sort();
+    const dates = [...getHabitDates(habit)].sort();
 
     if (dates.length === 0) {
       return 0;
@@ -70,6 +112,7 @@ export const StatisticsPage = () => {
 
     for (let i = dates.length - 1; i >= 0; i--) {
       const date = new Date(`${dates[i]}T00:00:00`);
+
       date.setHours(0, 0, 0, 0);
 
       const difference = (today - date) / (1000 * 60 * 60 * 24);
@@ -86,10 +129,10 @@ export const StatisticsPage = () => {
 
   const totalCompletions = useMemo(() => {
     return myhabits.reduce(
-      (total, habit) => total + (habit.completedDays?.length || 0),
+      (total, habit) => total + getHabitDates(habit).length,
       0,
     );
-  }, [myhabits]);
+  }, [myhabits, completedDays]);
 
   const bestStreakData = useMemo(() => {
     let bestStreak = 0;
@@ -108,7 +151,7 @@ export const StatisticsPage = () => {
       streak: bestStreak,
       habit: bestHabit,
     };
-  }, [myhabits]);
+  }, [myhabits, completedDays]);
 
   const currentStreakData = useMemo(() => {
     let currentStreak = 0;
@@ -127,7 +170,7 @@ export const StatisticsPage = () => {
       streak: currentStreak,
       habit: currentHabit,
     };
-  }, [myhabits]);
+  }, [myhabits, completedDays]);
 
   const completionRate = useMemo(() => {
     if (myhabits.length === 0) {
@@ -135,7 +178,7 @@ export const StatisticsPage = () => {
     }
 
     const totalDays = myhabits.reduce(
-      (total, habit) => total + (habit.completedDays?.length || 0),
+      (total, habit) => total + getHabitDates(habit).length,
       0,
     );
 
@@ -155,8 +198,12 @@ export const StatisticsPage = () => {
       return total + Math.max(days, 1);
     }, 0);
 
+    if (possibleDays === 0) {
+      return 0;
+    }
+
     return Math.min(Math.round((totalDays / possibleDays) * 100), 100);
-  }, [myhabits]);
+  }, [myhabits, completedDays]);
 
   const weeklyData = useMemo(() => {
     const today = new Date();
@@ -165,18 +212,20 @@ export const StatisticsPage = () => {
       const date = new Date(today);
 
       date.setDate(today.getDate() - (6 - index));
+
       date.setHours(0, 0, 0, 0);
 
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, "0");
+
       const day = String(date.getDate()).padStart(2, "0");
 
       const dateString = `${year}-${month}-${day}`;
 
       const completed = myhabits.reduce((total, habit) => {
-        const completedDays = habit.completedDays || [];
+        const dates = getHabitDates(habit);
 
-        return total + (completedDays.includes(dateString) ? 1 : 0);
+        return total + (dates.includes(dateString) ? 1 : 0);
       }, 0);
 
       return {
@@ -187,7 +236,7 @@ export const StatisticsPage = () => {
         completed,
       };
     });
-  }, [myhabits]);
+  }, [myhabits, completedDays]);
 
   const maxWeeklyCompletion = Math.max(
     ...weeklyData.map((day) => day.completed),
@@ -198,11 +247,11 @@ export const StatisticsPage = () => {
     return [...myhabits]
       .map((habit) => ({
         ...habit,
-        completions: habit.completedDays?.length || 0,
+        completions: getHabitDates(habit).length,
         streak: getHabitStreak(habit),
       }))
       .sort((a, b) => b.completions - a.completions);
-  }, [myhabits]);
+  }, [myhabits, completedDays]);
 
   const monthlyData = useMemo(() => {
     const today = new Date();
@@ -219,12 +268,13 @@ export const StatisticsPage = () => {
       });
 
       const year = date.getFullYear();
+
       const monthNumber = date.getMonth();
 
       let completions = 0;
 
       myhabits.forEach((habit) => {
-        (habit.completedDays || []).forEach((completedDate) => {
+        getHabitDates(habit).forEach((completedDate) => {
           const completed = new Date(`${completedDate}T00:00:00`);
 
           if (
@@ -242,7 +292,7 @@ export const StatisticsPage = () => {
         completions,
       };
     });
-  }, [myhabits]);
+  }, [myhabits, completedDays]);
 
   const maxMonthlyCompletion = Math.max(
     ...monthlyData.map((month) => month.completions),
@@ -468,7 +518,7 @@ export const StatisticsPage = () => {
 
                     <div className="space-y-5">
                       {habitPerformance.map((habit) => (
-                        <div key={habit.id}>
+                        <div key={habit._id}>
                           <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex min-w-0 items-center gap-2">
                               <span
@@ -524,7 +574,7 @@ export const StatisticsPage = () => {
                         .sort((a, b) => getHabitStreak(b) - getHabitStreak(a))
                         .map((habit, index) => (
                           <div
-                            key={habit.id}
+                            key={habit._id}
                             className="flex items-center justify-between gap-3 rounded-lg bg-gray-50 p-3 dark:bg-slate-800"
                           >
                             <div className="flex min-w-0 items-center gap-3">

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import greenLeave from "../assets/greenLeave.png";
 import { AddHabit } from "./AddHabit";
 import { Habbits } from "./Habbits";
@@ -7,35 +7,19 @@ import check from "../assets/check.png";
 import trophy from "../assets/trophy.png";
 import fire from "../assets/fire.png";
 import { DarkModeToggle } from "./DarkModeToggle";
-import { profile, deleteHabit, getCompletionDates } from "../api/endpoints";
+import { getCurrentUser } from "../utils/user";
 import { getToken } from "../utils/auth";
 import axios from "axios";
+import { deleteHabit, getCompletionDates } from "../api/endpoints";
 export const MainDashboard = () => {
   const [user, setUser] = useState(null); // fetch the current loggedin user
   const [addHabit, setAddHabit] = useState(false);
   const [myhabits, setMyHabits] = useState([]); //fetched the current loggedin user's habits
   const [completedDays, setcompletedDays] = useState({}); //fetched current user's logged in habits completion dates
-  const [totalCompletions, setTotalCompletions] = useState(0);
   const [editedHabit, setEditedHabit] = useState(null);
   const [search, setSearch] = useState("");
-  const [filteredHabits, setFilteredHabits] = useState([]);
   const [checked, setChecked] = useState(false);
   const [sort, setSort] = useState("");
-
-  const getCurrentUser = async () => {
-    const token = getToken();
-    try {
-      const user = await axios.get(profile, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      return user.data;
-    } catch {
-      return null;
-    }
-  };
 
   useEffect(() => {
     const loggedUser = async () => {
@@ -93,37 +77,47 @@ export const MainDashboard = () => {
       habit: largestStreakHabit,
     };
   }
-  // get total completions
   useEffect(() => {
     const loadCompletionDates = async () => {
       const token = getToken();
 
-      if (!token || !myhabits?.length) return;
+      if (!token) return;
+
+      if (!myhabits?.length) {
+        setcompletedDays({});
+        return;
+      }
 
       try {
-        const completionData = {};
-
-        for (const habit of myhabits) {
-          const response = await axios.get(
-            getCompletionDates.replace(":habitId", habit._id),
-            {
+        const responses = await Promise.all(
+          myhabits.map((habit) =>
+            axios.get(getCompletionDates.replace(":habitId", habit._id), {
               headers: {
                 Authorization: `Bearer ${token}`,
               },
-            },
-          );
+            }),
+          ),
+        );
 
-          completionData[habit._id] = response.data.dates || [];
-        }
-        const allDates = Object.values(completionData).flat().length;
-        setTotalCompletions(allDates);
+        const completionData = {};
+
+        myhabits.forEach((habit, index) => {
+          completionData[habit._id] = responses[index].data.dates || [];
+        });
+
+        setcompletedDays(completionData);
       } catch (error) {
         console.log("Error loading completion dates:", error);
       }
     };
 
     loadCompletionDates();
-  }, [myhabits, completedDays]);
+  }, [myhabits]);
+
+  const totalCompletions = useMemo(
+    () => Object.values(completedDays).reduce((total, dates) => total + dates.length, 0),
+    [completedDays],
+  );
 
   const result = getLargestStreak();
   const removeHabit = async (hid) => {
@@ -140,83 +134,40 @@ export const MainDashboard = () => {
     }
   };
 
-  const handleSearch = async (e) => {
-    const searchValue = e.target.value;
-    setSearch(searchValue);
-    let searchedHabits = [...myhabits];
-    if (searchValue === "") {
-      return myhabits;
-    }
-    if (searchValue) {
-      searchedHabits = [...myhabits].filter((habit) =>
-        habit.name.toLowerCase().includes(searchValue.toLowerCase()),
-      );
-    }
-    if (checked) {
-      searchedHabits = searchedHabits.filter(
-        (habit) => getHabitStreak(habit) > 3,
-      );
-    }
-
-    if (sort === "high") {
-      searchedHabits.sort((a, b) => getHabitStreak(b) - getHabitStreak(a));
-    }
-
-    if (sort === "low") {
-      searchedHabits.sort((a, b) => getHabitStreak(a) - getHabitStreak(b));
-    }
-    setFilteredHabits(searchedHabits);
-  };
-
-  function handleChecked(e) {
-    const isChecked = e.target.checked;
-
-    setChecked(isChecked);
-
-    const loggedUser = getCurrentUser();
-
-    if (!loggedUser) return;
-
-    let habits = [...(loggedUser.habits || [])];
+  const displayedHabits = useMemo(() => {
+    let habits = [...myhabits];
 
     if (search.trim()) {
+      const searchValue = search.trim().toLowerCase();
       habits = habits.filter((habit) =>
-        habit.name.toLowerCase().includes(search.toLowerCase()),
+        habit.name.toLowerCase().includes(searchValue),
       );
     }
 
-    if (isChecked) {
+    if (checked) {
       habits = habits.filter((habit) => getHabitStreak(habit) > 3);
     }
 
     if (sort === "high") {
       habits.sort((a, b) => getHabitStreak(b) - getHabitStreak(a));
-    }
-
-    if (sort === "low") {
+    } else if (sort === "low") {
       habits.sort((a, b) => getHabitStreak(a) - getHabitStreak(b));
     }
 
-    setMyHabits(habits);
-  }
+    return habits;
+  }, [myhabits, completedDays, search, checked, sort]);
 
-  function handleSort(e) {
-    const value = e.target.value;
+  const handleSearch = (e) => {
+    setSearch(e.target.value);
+  };
 
-    setSort(value);
+  const handleChecked = (e) => {
+    setChecked(e.target.checked);
+  };
 
-    const sortedHabits = [...myhabits];
-
-    if (value === "high") {
-      sortedHabits.sort((a, b) => getHabitStreak(b) - getHabitStreak(a));
-    }
-
-    if (value === "low") {
-      sortedHabits.sort((a, b) => getHabitStreak(a) - getHabitStreak(b));
-    }
-
-    setMyHabits(sortedHabits);
-  }
+  const handleSort = (e) => {
+    setSort(e.target.value);
+  };
 
   return (
     <div className="relative">
@@ -350,7 +301,8 @@ export const MainDashboard = () => {
               setSearch={setSearch}
               completedDays={completedDays}
               setcompletedDays={setcompletedDays}
-              filteredHabits={filteredHabits}
+              filteredHabits={displayedHabits}
+              deleteHabit={deleteHabit}
             />
           </div>
         </main>

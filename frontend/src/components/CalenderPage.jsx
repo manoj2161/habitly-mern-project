@@ -7,27 +7,64 @@ import {
   CalendarDays,
 } from "lucide-react";
 import clsx from "clsx";
+import { getCurrentUser } from "../utils/user";
+import { getCompletionDates } from "../api/endpoints";
+import { getToken } from "../utils/auth";
+import axios from "axios";
 
 export const CalendarPage = () => {
   const [myhabits, setMyHabits] = useState([]);
+  const [completedDays, setCompletedDays] = useState({});
   const [selectedHabit, setSelectedHabit] = useState(null);
   const [currentDate, setCurrentDate] = useState(new Date());
 
   useEffect(() => {
-    const data = JSON.parse(localStorage.getItem("users")) || [];
+    const loggedUser = async () => {
+      try {
+        const user = await getCurrentUser();
+        setMyHabits(user.habits || []);
+      } catch (error) {
+        console.error(error);
+      }
+    };
 
-    const loggedUser =
-      JSON.parse(localStorage.getItem("currentUser")) ||
-      JSON.parse(sessionStorage.getItem("currentUser"));
-
-    const existingUser = data.find((user) => user.id === loggedUser);
-
-    if (!existingUser) {
-      return;
-    }
-
-    setMyHabits(existingUser.habits || []);
+    loggedUser();
   }, []);
+
+  useEffect(() => {
+    const getCompletions = async () => {
+      if (myhabits.length === 0) {
+        setCompletedDays({});
+        return;
+      }
+
+      try {
+        const token = getToken();
+
+        const responses = await Promise.all(
+          myhabits.map((habit) =>
+            axios.get(getCompletionDates.replace(":habitId", habit._id), {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }),
+          ),
+        );
+
+        const completionData = {};
+
+        myhabits.forEach((habit, index) => {
+          completionData[habit._id] = responses[index].data.dates || [];
+        });
+
+        setCompletedDays(completionData);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    getCompletions();
+  }, [myhabits]);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -67,19 +104,23 @@ export const CalendarPage = () => {
 
   function nextMonth() {
     const date = new Date(currentDate);
-    date.setMonth(month + 1);
+    date.setMonth(date.getMonth() + 1);
     setCurrentDate(date);
   }
 
   function previousMonth() {
     const date = new Date(currentDate);
-    date.setMonth(month - 1);
+    date.setMonth(date.getMonth() - 1);
     setCurrentDate(date);
   }
 
+  const selectedHabitDates = selectedHabit
+    ? completedDays[selectedHabit._id] || []
+    : [];
+
   return (
     <div className="w-full min-h-screen flex bg-[#fef9f3] dark:bg-gray-950 text-gray-900 dark:text-white transition-colors">
-      <div className="w-0 lg:w-[20%] shrink-0">
+      <div className="w-0 shrink-0 lg:w-[20%]">
         <AsideDashboard />
       </div>
 
@@ -114,7 +155,7 @@ export const CalendarPage = () => {
                     }}
                     className="font-bold text-lg sm:text-xl ml-2"
                   >
-                    {selectedHabit.completedDays.length}
+                    {selectedHabitDates.length}
                   </span>
                 </div>
               </div>
@@ -157,8 +198,7 @@ export const CalendarPage = () => {
                 .toString()
                 .padStart(2, "0")}-${day.toString().padStart(2, "0")}`;
 
-              const isCompleted =
-                selectedHabit?.completedDays?.includes(dateString);
+              const isCompleted = selectedHabitDates.includes(dateString);
 
               const today = new Date();
 
@@ -179,6 +219,7 @@ export const CalendarPage = () => {
                     "min-w-7 min-h-7 flex items-center justify-center rounded-lg transition",
                     isCompleted && "text-white font-semibold",
                     isToday &&
+                      !isCompleted &&
                       "shadow-lg bg-orange-200 text-[#c54c24] font-bold",
                     "hover:shadow-lg hover:bg-orange-200 hover:text-[#c54c24]",
                   )}
@@ -204,9 +245,9 @@ export const CalendarPage = () => {
 
             {myhabits.map((habit) => (
               <div
-                key={habit.id}
+                key={habit._id}
                 className={clsx(
-                  selectedHabit?.id === habit.id && "bg-[#9F643D] text-white",
+                  selectedHabit?._id === habit._id && "bg-[#9F643D] text-white",
                   "flex flex-col sm:flex-row justify-between gap-3 p-3 sm:py-2 items-start sm:items-center mx-0 sm:mx-2 my-3 shadow-lg border rounded border-gray-300 dark:border-gray-700",
                 )}
               >

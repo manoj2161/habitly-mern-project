@@ -12,13 +12,7 @@ export const HabitCard = ({
   search,
   myhabits,
 }) => {
-  let result;
-
-  if (search !== "") {
-    result = filteredHabits;
-  } else {
-    result = myhabits;
-  }
+  const result = filteredHabits;
   return (
     <>
       {result.length > 0 ? (

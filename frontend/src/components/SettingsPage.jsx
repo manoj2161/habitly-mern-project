@@ -12,6 +12,15 @@ import {
 import { AsideDashboard } from "./AsideDashboard";
 import { useNavigate } from "react-router-dom";
 import { DarkModeToggle } from "./DarkModeToggle";
+import axios from "axios";
+
+import { getCurrentUser } from "../utils/user";
+import { getToken, clearAuth } from "../utils/auth";
+import {
+  updateUserName,
+  changePassword,
+  deleteAccount as deleteAccountEndpoint,
+} from "../api/endpoints";
 
 export const SettingsPage = () => {
   const [user, setUser] = useState(null);
@@ -23,18 +32,26 @@ export const SettingsPage = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const users = JSON.parse(localStorage.getItem("users")) || [];
+    async function loadUser() {
+      try {
+        const currentUser = await getCurrentUser();
 
-    const currentUser =
-      JSON.parse(localStorage.getItem("currentUser")) ||
-      JSON.parse(sessionStorage.getItem("currentUser"));
+        console.log("Settings user:", currentUser);
 
-    const loggedUser = users.find((item) => item.id === currentUser);
+        const userData = {
+          ...currentUser,
+          ...(currentUser?.data || {}),
+          ...(currentUser?.user || {}),
+        };
 
-    if (loggedUser) {
-      setUser(loggedUser);
-      setName(loggedUser.name || "");
+        setUser(userData);
+        setName(userData?.name || "");
+      } catch (error) {
+        console.error("Failed to load user:", error);
+      }
     }
+
+    loadUser();
 
     const savedDarkMode = JSON.parse(localStorage.getItem("darkMode")) || false;
 
@@ -49,7 +66,7 @@ export const SettingsPage = () => {
     }, 2500);
   }
 
-  function handleNameChange(e) {
+  async function handleNameChange(e) {
     e.preventDefault();
 
     if (!name.trim()) {
@@ -57,33 +74,41 @@ export const SettingsPage = () => {
       return;
     }
 
-    const users = JSON.parse(localStorage.getItem("users")) || [];
+    try {
+      const token = getToken();
 
-    const currentUser =
-      JSON.parse(localStorage.getItem("currentUser")) ||
-      JSON.parse(sessionStorage.getItem("currentUser"));
-
-    const updatedUsers = users.map((item) => {
-      if (item.id === currentUser) {
-        return {
-          ...item,
+      const response = await axios.put(
+        updateUserName,
+        {
           name: name.trim(),
-        };
-      }
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
 
-      return item;
-    });
+      const updatedUser =
+        response.data?.user || response.data?.data || response.data;
 
-    localStorage.setItem("users", JSON.stringify(updatedUsers));
+      setUser((prev) => ({
+        ...prev,
+        ...updatedUser,
+        name: updatedUser?.name || name.trim(),
+      }));
 
-    const updatedUser = updatedUsers.find((item) => item.id === currentUser);
+      setName(updatedUser?.name || name.trim());
 
-    setUser(updatedUser);
+      showMessage("Name updated successfully");
+    } catch (error) {
+      console.error("Failed to update name:", error);
 
-    showMessage("Name updated successfully");
+      showMessage(error.response?.data?.message || "Failed to update name");
+    }
   }
 
-  function handlePasswordChange(e) {
+  async function handlePasswordChange(e) {
     e.preventDefault();
 
     if (!password.trim()) {
@@ -91,36 +116,40 @@ export const SettingsPage = () => {
       return;
     }
 
-    if (password.length < 6) {
-      showMessage("Password must be at least 6 characters");
+    const passwordRegex =
+      /^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,64}$/;
+
+    if (!passwordRegex.test(password)) {
+      showMessage(
+        "Password must be 8-64 characters and contain uppercase, lowercase, number, and special character",
+      );
       return;
     }
 
-    const users = JSON.parse(localStorage.getItem("users")) || [];
+    try {
+      const token = getToken();
 
-    const currentUser =
-      JSON.parse(localStorage.getItem("currentUser")) ||
-      JSON.parse(sessionStorage.getItem("currentUser"));
-
-    const updatedUsers = users.map((item) => {
-      if (item.id === currentUser) {
-        return {
-          ...item,
+      await axios.put(
+        changePassword,
+        {
           password,
-        };
-      }
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
 
-      return item;
-    });
+      setPassword("");
+      setShowPassword(false);
 
-    localStorage.setItem("users", JSON.stringify(updatedUsers));
+      showMessage("Password updated successfully");
+    } catch (error) {
+      console.error("Failed to update password:", error);
 
-    const updatedUser = updatedUsers.find((item) => item.id === currentUser);
-
-    setUser(updatedUser);
-    setPassword("");
-
-    showMessage("Password updated successfully");
+      showMessage(error.response?.data?.message || "Failed to update password");
+    }
   }
 
   function handleLogout() {
@@ -128,13 +157,11 @@ export const SettingsPage = () => {
 
     if (!confirmed) return;
 
-    localStorage.removeItem("token");
-    sessionStorage.removeItem("token");
-
+    clearAuth();
     navigate("/", { replace: true });
   }
 
-  function deleteAccount() {
+  async function handleDeleteAccount() {
     if (!user) return;
 
     const confirmed = window.confirm(
@@ -143,23 +170,26 @@ export const SettingsPage = () => {
 
     if (!confirmed) return;
 
-    const users = JSON.parse(localStorage.getItem("users")) || [];
+    try {
+      const token = getToken();
 
-    const currentUser =
-      JSON.parse(localStorage.getItem("currentUser")) ||
-      JSON.parse(sessionStorage.getItem("currentUser"));
+      await axios.delete(deleteAccountEndpoint, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-    const updatedUsers = users.filter((item) => item.id !== currentUser);
+      clearAuth();
+      localStorage.removeItem("darkMode");
 
-    localStorage.setItem("users", JSON.stringify(updatedUsers));
+      document.documentElement.classList.remove("dark");
 
-    localStorage.removeItem("currentUser");
-    sessionStorage.removeItem("currentUser");
-    localStorage.removeItem("darkMode");
+      navigate("/", { replace: true });
+    } catch (error) {
+      console.error("Failed to delete account:", error);
 
-    document.documentElement.classList.remove("dark");
-
-    navigate("/", { replace: true });
+      showMessage(error.response?.data?.message || "Failed to delete account");
+    }
   }
 
   return (
@@ -171,16 +201,14 @@ export const SettingsPage = () => {
 
         <main className="w-full px-4 py-5 pb-[100px] sm:px-6 sm:py-6 lg:w-[80%] lg:pb-6">
           <div className="mx-auto max-w-5xl">
-            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-800 sm:text-3xl dark:text-white">
-                  Settings
-                </h1>
+            <div className="mb-6">
+              <h1 className="text-2xl font-bold text-gray-800 sm:text-3xl dark:text-white">
+                Settings
+              </h1>
 
-                <p className="mt-1 text-sm text-gray-500 sm:text-base dark:text-slate-400">
-                  Manage your account and application preferences.
-                </p>
-              </div>
+              <p className="mt-1 text-sm text-gray-500 sm:text-base dark:text-slate-400">
+                Manage your account and application preferences.
+              </p>
             </div>
 
             {message && (
@@ -191,6 +219,7 @@ export const SettingsPage = () => {
             )}
 
             <div className="space-y-5 sm:space-y-6">
+              {/* PROFILE */}
               <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
                 <div className="flex items-center gap-3 border-b border-gray-200 p-4 sm:p-5 dark:border-slate-700">
                   <div className="rounded-lg bg-blue-100 p-2 dark:bg-blue-950">
@@ -209,7 +238,7 @@ export const SettingsPage = () => {
                 </div>
 
                 <div className="p-4 sm:p-5">
-                  <div className="mb-6 flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:gap-5">
+                  <div className="mb-6 flex flex-col items-center gap-4 sm:flex-row sm:gap-5">
                     <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-green-100 dark:bg-green-950">
                       <User className="h-10 w-10 text-green-600 dark:text-green-400" />
                     </div>
@@ -258,6 +287,7 @@ export const SettingsPage = () => {
                 </div>
               </section>
 
+              {/* APPEARANCE */}
               <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
                 <div className="flex items-center gap-3 border-b border-gray-200 p-4 sm:p-5 dark:border-slate-700">
                   <div className="rounded-lg bg-purple-100 p-2 dark:bg-purple-950">
@@ -296,6 +326,7 @@ export const SettingsPage = () => {
                 </div>
               </section>
 
+              {/* SECURITY */}
               <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
                 <div className="flex items-center gap-3 border-b border-gray-200 p-4 sm:p-5 dark:border-slate-700">
                   <div className="rounded-lg bg-orange-100 p-2 dark:bg-orange-950">
@@ -349,6 +380,7 @@ export const SettingsPage = () => {
                 </div>
               </section>
 
+              {/* ACCOUNT */}
               <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
                 <div className="flex items-center gap-3 border-b border-gray-200 p-4 sm:p-5 dark:border-slate-700">
                   <div className="rounded-lg bg-gray-100 p-2 dark:bg-slate-800">
@@ -377,6 +409,7 @@ export const SettingsPage = () => {
                 </div>
               </section>
 
+              {/* DANGER ZONE */}
               <section className="overflow-hidden rounded-xl border border-red-200 bg-red-50 dark:border-red-950 dark:bg-red-950/30">
                 <div className="flex items-center gap-3 border-b border-red-200 p-4 sm:p-5 dark:border-red-950">
                   <div className="rounded-lg bg-red-100 p-2 dark:bg-red-950">
@@ -406,7 +439,7 @@ export const SettingsPage = () => {
                   </div>
 
                   <button
-                    onClick={deleteAccount}
+                    onClick={handleDeleteAccount}
                     className="flex w-full items-center justify-center gap-2 rounded-lg bg-red-500 px-4 py-2 text-white transition hover:bg-red-600 sm:w-auto"
                   >
                     <Trash2 className="h-4 w-4" />

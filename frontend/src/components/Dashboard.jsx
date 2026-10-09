@@ -4,7 +4,7 @@ import { MainDashboard } from "./MainDashboard";
 export const Dashboard = () => {
   return (
     <div className="w-full min-h-screen flex bg-[#fef9f3] dark:bg-gray-950 text-gray-900 dark:text-white transition-colors">
-      <div className="w-0 lg:w-[20%] shrink-0">
+      <div className="flex w-0 shrink-0 self-stretch lg:w-[20%]">
         <AsideDashboard />
       </div>
 

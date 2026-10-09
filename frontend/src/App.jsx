@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Route, Routes } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Route, Routes, useNavigate } from "react-router-dom";
 import { Login } from "./components/Login";
 import { SignUp } from "./components/SignUp";
 import { Dashboard } from "./components/Dashboard";
@@ -10,19 +10,32 @@ import { SettingsPage } from "./components/SettingsPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { PageLoader } from "./components/PageLoader";
 import { ForgotPassword } from "./components/ForgotPassword";
+
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    return Boolean(
-      localStorage.getItem("token") || sessionStorage.getItem("token"),
-    );
-  });
+  const navigate = useNavigate();
+  const [isLoggedIn, setIsLoggedIn] = useState(() =>
+    Boolean(localStorage.getItem("token") || sessionStorage.getItem("token")),
+  );
+
+  useEffect(() => {
+    const handleAuthChange = (event) => {
+      const loggedIn = Boolean(event.detail);
+      setIsLoggedIn(loggedIn);
+
+      if (!loggedIn) {
+        navigate("/", { replace: true });
+      }
+    };
+
+    window.addEventListener("auth-change", handleAuthChange);
+    return () => window.removeEventListener("auth-change", handleAuthChange);
+  }, [navigate]);
 
   return (
     <>
       <PageLoader />
       <Routes>
         <Route path="/" element={<Login setIsLoggedIn={setIsLoggedIn} />} />
-
         <Route
           path="/signup"
           element={<SignUp setIsLoggedIn={setIsLoggedIn} />}
@@ -36,7 +49,6 @@ function App() {
             </ProtectedRoute>
           }
         />
-
         <Route
           path="/myhabits"
           element={
@@ -45,7 +57,6 @@ function App() {
             </ProtectedRoute>
           }
         />
-
         <Route
           path="/calender"
           element={
@@ -54,7 +65,6 @@ function App() {
             </ProtectedRoute>
           }
         />
-
         <Route
           path="/statistics"
           element={
@@ -63,7 +73,6 @@ function App() {
             </ProtectedRoute>
           }
         />
-
         <Route
           path="/settings"
           element={

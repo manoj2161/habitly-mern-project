@@ -1,52 +1,65 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Lock, Mail, Eye, EyeClosed, ArrowLeft } from "lucide-react";
+import axios from "axios";
+import { forgotPasswordEmail, resetPassword } from "../api/endpoints";
 
 export const ForgotPassword = () => {
   const navigate = useNavigate();
-
   const [email, setEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [resetToken, setResetToken] = useState("");
   const [step, setStep] = useState(1);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  function handleEmailSubmit(e) {
+  async function handleEmailSubmit(e) {
     e.preventDefault();
-
-    const users = JSON.parse(localStorage.getItem("users")) || [];
-
-    const existingUser = users.find(
-      (user) => user.email === email.trim().toLowerCase(),
-    );
+    setError("");
+    setSuccess("");
 
     if (!email.trim()) {
       setError("Email is required");
       return;
     }
 
-    if (!existingUser) {
-      setError("No account found with this email");
-      return;
-    }
+    try {
+      setLoading(true);
+      const response = await axios.post(forgotPasswordEmail, {
+        email: email.trim().toLowerCase(),
+      });
 
-    setError("");
-    setStep(2);
+      const token = response.data?.token;
+      if (!token) {
+        setError("Unable to start password reset");
+        return;
+      }
+
+      setResetToken(token);
+      setStep(2);
+    } catch (error) {
+      setError(error.response?.data?.message || "Unable to find account");
+    } finally {
+      setLoading(false);
+    }
   }
 
-  function handlePasswordSubmit(e) {
+  async function handlePasswordSubmit(e) {
     e.preventDefault();
+    setError("");
+    setSuccess("");
 
-    if (!newPassword.trim()) {
-      setError("New password is required");
-      return;
-    }
+    const passwordRegex =
+      /^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,64}$/;
 
-    if (newPassword.length < 6) {
-      setError("Password must be at least 6 characters");
+    if (!passwordRegex.test(newPassword)) {
+      setError(
+        "Password must be 8-64 characters and contain uppercase, lowercase, number, and special character",
+      );
       return;
     }
 
@@ -60,22 +73,29 @@ export const ForgotPassword = () => {
       return;
     }
 
-    const users = JSON.parse(localStorage.getItem("users")) || [];
+    try {
+      setLoading(true);
 
-    const updatedUsers = users.map((user) =>
-      user.email === email.trim().toLowerCase()
-        ? { ...user, password: newPassword }
-        : user,
-    );
+      await axios.put(
+        resetPassword,
+        { password: newPassword },
+        {
+          headers: {
+            Authorization: `Bearer ${resetToken}`,
+          },
+        },
+      );
 
-    localStorage.setItem("users", JSON.stringify(updatedUsers));
+      setSuccess("Password reset successfully");
 
-    setError("");
-    setSuccess("Password reset successfully");
-
-    setTimeout(() => {
-      navigate("/");
-    }, 1000);
+      setTimeout(() => {
+        navigate("/", { replace: true });
+      }, 1000);
+    } catch (error) {
+      setError(error.response?.data?.message || "Unable to reset password");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -83,7 +103,6 @@ export const ForgotPassword = () => {
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold">Reset Password</h1>
-
           <p className="mt-2 text-gray-600 dark:text-gray-400">
             {step === 1
               ? "Enter your email to reset your password"
@@ -100,10 +119,8 @@ export const ForgotPassword = () => {
               <label htmlFor="reset-email" className="mb-2 block font-semibold">
                 Email
               </label>
-
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 size-5 -translate-y-1/2 text-[#FDC8A0]" />
-
                 <input
                   type="email"
                   id="reset-email"
@@ -122,9 +139,10 @@ export const ForgotPassword = () => {
 
             <button
               type="submit"
-              className="h-11 rounded-md bg-[#c64d26] font-semibold text-white transition hover:bg-[#ad401e]"
+              disabled={loading}
+              className="h-11 rounded-md bg-[#c64d26] font-semibold text-white transition hover:bg-[#ad401e] disabled:opacity-60"
             >
-              Continue
+              {loading ? "Checking..." : "Continue"}
             </button>
 
             <button
@@ -142,16 +160,11 @@ export const ForgotPassword = () => {
             className="flex flex-col gap-5 rounded-xl bg-white p-6 shadow-lg dark:bg-gray-900 sm:p-8"
           >
             <div>
-              <label
-                htmlFor="new-password"
-                className="mb-2 block font-semibold"
-              >
+              <label htmlFor="new-password" className="mb-2 block font-semibold">
                 New Password
               </label>
-
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 size-5 -translate-y-1/2 text-[#FDC8A0]" />
-
                 <input
                   type={showPassword ? "text" : "password"}
                   id="new-password"
@@ -163,7 +176,6 @@ export const ForgotPassword = () => {
                   placeholder="Enter new password"
                   className="h-11 w-full rounded-md border-2 border-[#FDC8A0] bg-transparent pl-10 pr-10 focus:border-[#c64d26] focus:outline-none dark:bg-gray-800"
                 />
-
                 {showPassword ? (
                   <EyeClosed
                     onClick={() => setShowPassword(false)}
@@ -179,16 +191,11 @@ export const ForgotPassword = () => {
             </div>
 
             <div>
-              <label
-                htmlFor="confirm-password"
-                className="mb-2 block font-semibold"
-              >
+              <label htmlFor="confirm-password" className="mb-2 block font-semibold">
                 Confirm Password
               </label>
-
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 size-5 -translate-y-1/2 text-[#FDC8A0]" />
-
                 <input
                   type={showConfirmPassword ? "text" : "password"}
                   id="confirm-password"
@@ -200,7 +207,6 @@ export const ForgotPassword = () => {
                   placeholder="Confirm new password"
                   className="h-11 w-full rounded-md border-2 border-[#FDC8A0] bg-transparent pl-10 pr-10 focus:border-[#c64d26] focus:outline-none dark:bg-gray-800"
                 />
-
                 {showConfirmPassword ? (
                   <EyeClosed
                     onClick={() => setShowConfirmPassword(false)}
@@ -216,23 +222,25 @@ export const ForgotPassword = () => {
             </div>
 
             {error && <p className="text-sm text-red-500">{error}</p>}
-
             {success && (
-              <p className="text-sm text-green-600 dark:text-green-400">
-                {success}
-              </p>
+              <p className="text-sm text-green-600 dark:text-green-400">{success}</p>
             )}
 
             <button
               type="submit"
-              className="h-11 rounded-md bg-[#c64d26] font-semibold text-white transition hover:bg-[#ad401e]"
+              disabled={loading}
+              className="h-11 rounded-md bg-[#c64d26] font-semibold text-white transition hover:bg-[#ad401e] disabled:opacity-60"
             >
-              Reset Password
+              {loading ? "Resetting..." : "Reset Password"}
             </button>
 
             <button
               type="button"
-              onClick={() => setStep(1)}
+              onClick={() => {
+                setStep(1);
+                setResetToken("");
+                setError("");
+              }}
               className="flex items-center justify-center gap-2 font-semibold text-[#c64d26]"
             >
               <ArrowLeft className="size-4" />

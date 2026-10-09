@@ -3,54 +3,91 @@ import { Pencil, Trash2, GripVertical } from "lucide-react";
 import { NoHabbit } from "./NoHabbit";
 import { useEffect, useMemo, useState } from "react";
 import { AddHabit } from "./AddHabit";
+import { getCurrentUser } from "../utils/user";
+import { deleteHabit, getCompletionDates } from "../api/endpoints";
+import axios from "axios";
+import { getToken } from "../utils/auth";
 import clsx from "clsx";
 
 export const HabitsPage = () => {
   const [addHabit, setAddHabit] = useState(false);
   const [myhabits, setMyHabits] = useState([]);
+  const [completedDays, setCompletedDays] = useState({});
   const [editedHabit, setEditedHabit] = useState(null);
   const [search, setSearch] = useState("");
   const [streakFilter, setStreakFilter] = useState(false);
   const [sort, setSort] = useState("");
 
   useEffect(() => {
-    const users = JSON.parse(localStorage.getItem("users")) || [];
+    const loggedUser = async () => {
+      try {
+        const user = await getCurrentUser();
+        setMyHabits(user.habits || []);
+      } catch (error) {
+        console.error(error);
+      }
+    };
 
-    const currentUser =
-      JSON.parse(localStorage.getItem("currentUser")) ||
-      JSON.parse(sessionStorage.getItem("currentUser"));
-
-    const loggedUser = users.find((user) => user.id === currentUser);
-
-    if (loggedUser) {
-      setMyHabits(loggedUser.habits || []);
-    }
+    loggedUser();
   }, []);
 
-  function removeHabit(hid) {
-    const users = JSON.parse(localStorage.getItem("users")) || [];
+  useEffect(() => {
+    const getCompletions = async () => {
+      if (myhabits.length === 0) {
+        setCompletedDays({});
+        return;
+      }
 
-    const currentUser =
-      JSON.parse(localStorage.getItem("currentUser")) ||
-      JSON.parse(sessionStorage.getItem("currentUser"));
+      try {
+        const token = getToken();
+        const completionData = {};
 
-    const loggedUser = users.find((user) => user.id === currentUser);
+        const responses = await Promise.all(
+          myhabits.map((habit) =>
+            axios.get(getCompletionDates.replace(":habitId", habit._id), {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }),
+          ),
+        );
+        myhabits.forEach((habit, index) => {
+          completionData[habit._id] = responses[index].data.dates || [];
+        });
 
-    if (!loggedUser) return;
+        setCompletedDays(completionData);
+      } catch (error) {
+        console.error(error);
+      }
+    };
 
-    const updatedHabits = (loggedUser.habits || []).filter(
-      (habit) => habit.id !== hid,
-    );
+    getCompletions();
+  }, [myhabits]);
 
-    loggedUser.habits = updatedHabits;
+  const removeHabit = async (hid) => {
+    const confirmed = confirm("Are you sure you want to delete this habit?");
 
-    localStorage.setItem("users", JSON.stringify(users));
+    if (!confirmed) {
+      return;
+    }
 
-    setMyHabits(updatedHabits);
-  }
+    try {
+      const token = getToken();
+
+      await axios.delete(deleteHabit.replace(":habitId", hid), {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      setMyHabits((prev) => prev.filter((habit) => habit._id !== hid));
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   function getHabitStreak(habit) {
-    const dates = [...(habit.completedDays || [])].sort();
+    const dates = [...(completedDays[habit._id] || [])].sort();
 
     if (dates.length === 0) {
       return 0;
@@ -71,9 +108,7 @@ export const HabitsPage = () => {
         currentStreak = 1;
       }
 
-      if (currentStreak > largestStreak) {
-        largestStreak = currentStreak;
-      }
+      largestStreak = Math.max(largestStreak, currentStreak);
     }
 
     return largestStreak;
@@ -101,11 +136,11 @@ export const HabitsPage = () => {
     }
 
     return habits;
-  }, [myhabits, search, streakFilter, sort]);
+  }, [myhabits, search, streakFilter, sort, completedDays]);
 
   return (
     <div className="w-full min-h-screen flex bg-[#fef9f3] dark:bg-gray-950 text-gray-900 dark:text-white transition-colors">
-      <div className="w-0 lg:w-[20%] shrink-0">
+      <div className="w-0 shrink-0 lg:w-[20%]">
         <AsideDashboard />
       </div>
 
@@ -155,7 +190,7 @@ export const HabitsPage = () => {
               <div className="space-y-3">
                 {displayedHabits.map((habit) => (
                   <div
-                    key={habit.id}
+                    key={habit._id}
                     className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 border border-gray-200 dark:border-gray-700 rounded-lg"
                   >
                     <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -187,7 +222,7 @@ export const HabitsPage = () => {
                       </button>
 
                       <button
-                        onClick={() => removeHabit(habit.id)}
+                        onClick={() => removeHabit(habit._id)}
                         className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-950"
                       >
                         <Trash2 className="w-5 text-red-500" />

@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import clsx from "clsx";
+import { clearAuth } from "../utils/auth";
 
 export const AsideDashboard = () => {
   const navigate = useNavigate();
@@ -43,14 +44,15 @@ export const AsideDashboard = () => {
   ];
 
   function handleLogout() {
-    localStorage.removeItem("token");
-    sessionStorage.removeItem("token");
-    navigate("/");
+    if (confirm("Are you sure you want to log out?")) {
+      clearAuth();
+      navigate("/", { replace: true });
+    }
   }
 
   return (
     <>
-      <aside className="hidden h-screen w-full flex-col justify-between bg-[#fef9f3] shadow-lg transition-colors lg:flex dark:bg-gray-900 dark:text-white">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden h-screen w-[20%] flex-col justify-between overflow-y-auto bg-[#fef9f3] shadow-lg transition-colors lg:flex dark:bg-gray-900 dark:text-white">
         <div>
           <div className="flex flex-col items-center">
             <img src={girlImage} alt="SelfLove" className="w-40 xl:w-52" />
@@ -86,7 +88,7 @@ export const AsideDashboard = () => {
         <button
           type="button"
           onClick={handleLogout}
-          className="mx-5 mb-5 flex items-center gap-3 rounded-lg p-3 font-semibold transition hover:bg-[#fbede3] hover:text-[#c64d26] dark:hover:bg-gray-800 dark:hover:text-[#c64d26]"
+          className="absolute bottom-5 left-5 flex items-center gap-3 rounded-lg p-3 font-semibold transition hover:bg-[#fbede3] hover:text-[#c64d26] dark:hover:bg-gray-800 dark:hover:text-[#c64d26]"
         >
           <LogOut className="size-5" />
           Log Out

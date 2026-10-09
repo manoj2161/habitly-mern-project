@@ -72,9 +72,8 @@ export const AddHabit = ({
             Authorization: `Bearer ${token}`,
           },
         });
-        console.log(response.data);
         setEditedHabit(null);
-        setMyHabits((prev) => [...prev, response.data.data]);
+        setMyHabits((prev) => [...prev, response.data.habit]);
         setAddHabit(false);
       }
       if (editedHabit !== null) {
