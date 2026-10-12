@@ -10,6 +10,7 @@ import { DarkModeToggle } from "./DarkModeToggle";
 import { getCurrentUser } from "../utils/user";
 import { getToken } from "../utils/auth";
 import axios from "axios";
+import AIAssistant from "./AIAssistantt";
 import { deleteHabit, getCompletionDates } from "../api/endpoints";
 export const MainDashboard = () => {
   const [user, setUser] = useState(null); // fetch the current loggedin user
@@ -115,7 +116,11 @@ export const MainDashboard = () => {
   }, [myhabits]);
 
   const totalCompletions = useMemo(
-    () => Object.values(completedDays).reduce((total, dates) => total + dates.length, 0),
+    () =>
+      Object.values(completedDays).reduce(
+        (total, dates) => total + dates.length,
+        0,
+      ),
     [completedDays],
   );
 
@@ -171,6 +176,7 @@ export const MainDashboard = () => {
 
   return (
     <div className="relative">
+      <AIAssistant />
       {addHabit && (
         <AddHabit
           editedHabit={editedHabit}

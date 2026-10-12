@@ -10,7 +10,6 @@ import { SettingsPage } from "./components/SettingsPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { PageLoader } from "./components/PageLoader";
 import { ForgotPassword } from "./components/ForgotPassword";
-
 function App() {
   const navigate = useNavigate();
   const [isLoggedIn, setIsLoggedIn] = useState(() =>
