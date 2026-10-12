@@ -1,6 +1,6 @@
 import girlImage from "../assets/girlImage.png";
 import { useNavigate } from "react-router-dom";
-import { Mail, Lock, Eye, EyeClosed } from "lucide-react";
+import { Mail, Lock, Eye, EyeClosed, Loader2 } from "lucide-react";
 import { useState } from "react";
 import axios from "axios";
 import { login } from "../api/endpoints";
@@ -14,6 +14,7 @@ export const Login = ({ setIsLoggedIn }) => {
 
   const [errors, setErrors] = useState({});
   const [show, setShow] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const navigate = useNavigate();
 
@@ -33,6 +34,11 @@ export const Login = ({ setIsLoggedIn }) => {
 
   async function handleSignin(e) {
     e.preventDefault();
+
+    if (isLoading) {
+      return;
+    }
+
     const newErrors = {};
     if (!formData.email.trim()) {
       newErrors.email = "Email is required";
@@ -48,8 +54,12 @@ export const Login = ({ setIsLoggedIn }) => {
       email: formData.email,
       password: formData.password,
     };
+    setIsLoading(true);
+
     try {
-      const data = await axios.post(login, user);
+      const data = await axios.post(login, user, {
+        withCredentials: true,
+      });
       const token = data.data.token;
       if (formData.rememberMe) {
         localStorage.setItem("token", token);
@@ -62,6 +72,7 @@ export const Login = ({ setIsLoggedIn }) => {
     } catch (error) {
       newErrors.password = error.response?.data?.message || "Unable to sign in";
       setErrors(newErrors);
+      setIsLoading(false);
       return;
     }
   }
@@ -196,9 +207,17 @@ export const Login = ({ setIsLoggedIn }) => {
 
           <button
             type="submit"
-            className="bg-[#c64d26] hover:bg-[#ad401e] rounded-md h-11 text-white text-base sm:text-lg font-semibold transition"
+            disabled={isLoading}
+            className="bg-[#c64d26] hover:bg-[#ad401e] rounded-md h-11 text-white text-base sm:text-lg font-semibold transition disabled:cursor-not-allowed disabled:opacity-70 flex items-center justify-center gap-2"
           >
-            Sign In
+            {isLoading ? (
+              <>
+                <Loader2 size={20} className="animate-spin" />
+                Signing In...
+              </>
+            ) : (
+              "Sign In"
+            )}
           </button>
         </form>
 

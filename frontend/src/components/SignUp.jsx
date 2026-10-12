@@ -1,6 +1,6 @@
 import girlImage from "../assets/girlImage.png";
 import { useNavigate } from "react-router-dom";
-import { Mail, Lock, EyeClosed, UserRound, Eye } from "lucide-react";
+import { Mail, Lock, EyeClosed, UserRound, Eye, Loader2 } from "lucide-react";
 import { useState } from "react";
 import axios from "axios";
 import { register } from "../api/endpoints";
@@ -15,6 +15,7 @@ export const SignUp = () => {
   const [errors, setErrors] = useState({});
   const [show, setShow] = useState(false);
   const [cshow, setCShow] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const navigate = useNavigate();
 
@@ -34,6 +35,11 @@ export const SignUp = () => {
 
   async function handleSignup(e) {
     e.preventDefault();
+
+    if (isLoading) {
+      return;
+    }
+
     const newErrors = {};
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -72,13 +78,18 @@ export const SignUp = () => {
       email: formData.email.trim().toLowerCase(),
       password: formData.password,
     };
+    setIsLoading(true);
+
     try {
-      const userData = await axios.post(register, newUser);
+      const userData = await axios.post(register, newUser, {
+        withCredentials: true,
+      });
       console.log(userData);
       navigate("/");
     } catch (error) {
       newErrors.email = error.response?.data?.message || "Unable to create account";
       setErrors(newErrors);
+      setIsLoading(false);
       return;
     }
   }
@@ -256,9 +267,17 @@ export const SignUp = () => {
 
           <button
             type="submit"
-            className="bg-[#c64d26] hover:bg-[#ad401e] rounded-md h-11 text-white text-base sm:text-lg font-semibold transition"
+            disabled={isLoading}
+            className="bg-[#c64d26] hover:bg-[#ad401e] rounded-md h-11 text-white text-base sm:text-lg font-semibold transition disabled:cursor-not-allowed disabled:opacity-70 flex items-center justify-center gap-2"
           >
-            Sign Up
+            {isLoading ? (
+              <>
+                <Loader2 size={20} className="animate-spin" />
+                Creating Account...
+              </>
+            ) : (
+              "Sign Up"
+            )}
           </button>
         </form>
 
