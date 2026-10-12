@@ -10,6 +10,7 @@ import { SettingsPage } from "./components/SettingsPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { PageLoader } from "./components/PageLoader";
 import { ForgotPassword } from "./components/ForgotPassword";
+import OfflineBanner from "./components/OfflineBanner";
 function App() {
   const navigate = useNavigate();
   const [isLoggedIn, setIsLoggedIn] = useState(() =>
@@ -33,6 +34,7 @@ function App() {
   return (
     <>
       <PageLoader />
+      <OfflineBanner />
       <Routes>
         <Route path="/" element={<Login setIsLoggedIn={setIsLoggedIn} />} />
         <Route
