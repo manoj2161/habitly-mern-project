@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import axios from "axios";
 import { Bot, Send, X, Loader2, MessageCircle, Square } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -25,6 +26,21 @@ const AIAssistant = () => {
       return;
     }
 
+    // Check internet connection before sending
+    if (!navigator.onLine) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            "No internet connection. Please check your network and try again.",
+          isError: true,
+        },
+      ]);
+
+      return;
+    }
+
     const userMessage = {
       role: "user",
       content: trimmedMessage,
@@ -38,25 +54,21 @@ const AIAssistant = () => {
     abortControllerRef.current = controller;
 
     try {
-      const response = await fetch(API_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      const response = await axios.post(
+        API_URL,
+        {
           project: "habitly",
           message: trimmedMessage,
-        }),
-        signal: controller.signal,
-      });
+        },
+        {
+          signal: controller.signal,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.message || "Unable to get a response from the assistant.",
-        );
-      }
+      const data = response.data;
 
       setMessages((prev) => [
         ...prev,
@@ -66,16 +78,36 @@ const AIAssistant = () => {
         },
       ]);
     } catch (error) {
-      if (error.name === "AbortError") {
+      // User cancelled the request
+      if (error.name === "CanceledError" || error.code === "ERR_CANCELED") {
         return;
       }
+
+      // Internet connection was lost
+      if (!navigator.onLine) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content:
+              "No internet connection. Please check your network and try again.",
+            isError: true,
+          },
+        ]);
+
+        return;
+      }
+
+      // Backend/API error
+      const errorMessage =
+        error.response?.data?.message ||
+        "Something went wrong. Please try again later.";
 
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content:
-            error.message || "Something went wrong. Please try again later.",
+          content: errorMessage,
           isError: true,
         },
       ]);
