@@ -15,7 +15,7 @@ import { DarkModeToggle } from "./DarkModeToggle";
 import axios from "axios";
 
 import { getCurrentUser } from "../utils/user";
-import { getToken, clearAuth } from "../utils/auth";
+import { getToken, clearAuth, logoutUser } from "../utils/auth";
 import {
   updateUserName,
   changePassword,
@@ -152,12 +152,18 @@ export const SettingsPage = () => {
     }
   }
 
-  function handleLogout() {
+  async function handleLogout() {
     const confirmed = window.confirm("Are you sure you want to logout?");
 
     if (!confirmed) return;
 
-    clearAuth();
+    try {
+      await logoutUser();
+    } catch (error) {
+      console.error("Failed to logout:", error);
+      clearAuth();
+    }
+
     navigate("/", { replace: true });
   }
 

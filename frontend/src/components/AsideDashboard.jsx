@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import clsx from "clsx";
-import { clearAuth } from "../utils/auth";
+import { logoutUser } from "../utils/auth";
 
 export const AsideDashboard = () => {
   const navigate = useNavigate();
@@ -43,11 +43,18 @@ export const AsideDashboard = () => {
     },
   ];
 
-  function handleLogout() {
-    if (confirm("Are you sure you want to log out?")) {
-      clearAuth();
-      navigate("/", { replace: true });
+  async function handleLogout() {
+    if (!confirm("Are you sure you want to log out?")) {
+      return;
     }
+
+    try {
+      await logoutUser();
+    } catch (error) {
+      console.error("Failed to logout:", error);
+    }
+
+    navigate("/", { replace: true });
   }
 
   return (

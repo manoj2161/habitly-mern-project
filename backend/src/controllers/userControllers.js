@@ -4,11 +4,42 @@ import jwt from "jsonwebtoken";
 import { Habit } from "../models/habitModel.js";
 import { Completed } from "../models/completionModel.js";
 import "dotenv/config";
+import { generateAccessToken, generateRefreshToken } from "../utils/token.js";
 
 const nameRegex = /^[A-Za-z '-]+$/;
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const passwordRegex =
   /^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,64}$/;
+
+const getRefreshCookieOptions = (req) => {
+  const isSecure = req.secure;
+
+  return {
+    httpOnly: true,
+    secure: isSecure,
+    sameSite: isSecure ? "none" : "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: "/",
+  };
+};
+
+const getRefreshTokenFromCookie = (req) => {
+  const cookieHeader = req.headers.cookie;
+
+  if (!cookieHeader) {
+    return null;
+  }
+
+  const match = cookieHeader.match(/(?:^|;\s*)refreshToken=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : null;
+};
+
+const clearRefreshCookie = (req, res) => {
+  const options = getRefreshCookieOptions(req);
+  delete options.maxAge;
+  res.clearCookie("refreshToken", options);
+};
+
 
 const validateName = (name) => {
   if (typeof name !== "string" || !name.trim()) return "Name is required";
@@ -72,7 +103,12 @@ export const registerUser = async (req, res) => {
 export const loginUser = async (req, res) => {
   const { email, password } = req.body || {};
 
-  if (typeof email !== "string" || !email.trim() || typeof password !== "string" || !password.trim()) {
+  if (
+    typeof email !== "string" ||
+    !email.trim() ||
+    typeof password !== "string" ||
+    !password.trim()
+  ) {
     return res.status(400).json({
       message: "Email and Password should not be empty",
       isSuccess: false,
@@ -84,20 +120,98 @@ export const loginUser = async (req, res) => {
   const user = await User.findOne({ email: cleanedEmail });
 
   if (!user) {
-    return res.status(404).json({ message: "User not found", isSuccess: false, errorCode: 404 });
+    return res.status(404).json({
+      message: "User not found",
+      isSuccess: false,
+      errorCode: 404,
+    });
   }
 
   const isValidPassword = await bcrypt.compare(password, user.password);
+
   if (!isValidPassword) {
-    return res.status(401).json({ message: "Invalid email or password", isSuccess: false, errorCode: 401 });
+    return res.status(401).json({
+      message: "Invalid email or password",
+      isSuccess: false,
+      errorCode: 401,
+    });
   }
 
-  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+  const accessToken = generateAccessToken(user._id);
+  const refreshToken = generateRefreshToken(user._id);
+
+  res.cookie("refreshToken", refreshToken, getRefreshCookieOptions(req));
 
   res.status(200).json({
     message: "User login successful",
-    data: { id: user._id, name: user.name, email: user.email },
-    token,
+    data: {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+    },
+    token: accessToken,
+    isSuccess: true,
+  });
+};
+
+export const refreshAccessToken = async (req, res) => {
+  const refreshToken = getRefreshTokenFromCookie(req);
+
+  if (!refreshToken) {
+    return res.status(401).json({
+      message: "Refresh token is missing",
+      isSuccess: false,
+      errorCode: 401,
+    });
+  }
+
+  try {
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+    const userId = decoded.id || decoded.userId;
+
+    if (!userId) {
+      return res.status(401).json({
+        message: "Invalid refresh token",
+        isSuccess: false,
+        errorCode: 401,
+      });
+    }
+
+    const user = await User.findById(userId).select("_id");
+
+    if (!user) {
+      clearRefreshCookie(req, res);
+
+      return res.status(401).json({
+        message: "User not found",
+        isSuccess: false,
+        errorCode: 401,
+      });
+    }
+
+    const accessToken = generateAccessToken(user._id);
+
+    return res.status(200).json({
+      message: "Access token refreshed successfully",
+      token: accessToken,
+      isSuccess: true,
+    });
+  } catch {
+    clearRefreshCookie(req, res);
+
+    return res.status(401).json({
+      message: "Invalid or expired refresh token",
+      isSuccess: false,
+      errorCode: 401,
+    });
+  }
+};
+
+export const logoutUser = (req, res) => {
+  clearRefreshCookie(req, res);
+
+  return res.status(200).json({
+    message: "Logout successful",
     isSuccess: true,
   });
 };
@@ -178,6 +292,8 @@ export const deleteUser = async (req, res) => {
   await Completed.deleteMany({ userId: id });
   await Habit.deleteMany({ userId: id });
   await User.findByIdAndDelete(id);
+
+  clearRefreshCookie(req, res);
 
   res.status(200).json({ message: "Account deleted successfully", isSuccess: true });
 };

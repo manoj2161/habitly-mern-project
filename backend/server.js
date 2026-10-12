@@ -11,12 +11,33 @@ dns.setServers(["8.8.8.8", "8.8.4.4"]);
 
 const app = express();
 
+app.set("trust proxy", 1);
+
+const allowedOrigins = [
+  "https://habitlyx.vercel.app",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+];
+
+if (process.env.CLIENT_ORIGIN) {
+  allowedOrigins.push(process.env.CLIENT_ORIGIN);
+}
+
 app.use(
   cors({
-    origin: "https://habitlyx.vercel.app",
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Origin not allowed by CORS"));
+    },
     credentials: true,
   }),
 );
+
+app.use(express.json());
+
 const PORT = process.env.PORT || 3000;
 const APP_NAME = process.env.APP_NAME || "Habitly";
 

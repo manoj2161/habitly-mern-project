@@ -2,6 +2,8 @@ import express from "express";
 import {
   registerUser,
   loginUser,
+  refreshAccessToken,
+  logoutUser,
   userDashboard,
   updateName,
   updatePassword,
@@ -14,6 +16,8 @@ import { emailToken } from "../middleware/forgotPasswordAuth.js";
 const router = express.Router();
 router.post("/register", registerUser);
 router.post("/login", loginUser);
+router.post("/refresh", refreshAccessToken);
+router.post("/logout", logoutUser);
 router.get("/dashboard/profile", authToken, userDashboard);
 router.put("/dashboard/profile/name", authToken, updateName);
 router.put("/dashboard/profile/password", authToken, updatePassword);

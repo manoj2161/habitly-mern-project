@@ -14,3 +14,6 @@ export const changePassword = `${url}/api/auth/user/dashboard/profile/password`;
 export const deleteAccount = `${url}/api/auth/user/dashboard/profile/delete`;
 export const forgotPasswordEmail = `${url}/api/auth/user/forgot-password/email`;
 export const resetPassword = `${url}/api/auth/user/forgot-password/reset`;
+
+export const refreshToken = `${url}/api/auth/user/refresh`;
+export const logout = `${url}/api/auth/user/logout`;
