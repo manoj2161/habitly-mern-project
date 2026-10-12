@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { Mail, Lock, Eye, EyeClosed, Loader2 } from "lucide-react";
 import { useState } from "react";
 import axios from "axios";
-import { login } from "../api/endpoints";
+import { login, resendVerification } from "../api/endpoints";
 import { notifyLogin } from "../utils/auth";
+
 export const Login = ({ setIsLoggedIn }) => {
   const [formData, setFormData] = useState({
     email: "",
@@ -15,6 +16,10 @@ export const Login = ({ setIsLoggedIn }) => {
   const [errors, setErrors] = useState({});
   const [show, setShow] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  const [showResend, setShowResend] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
 
   const navigate = useNavigate();
 
@@ -30,6 +35,11 @@ export const Login = ({ setIsLoggedIn }) => {
       ...prev,
       [name]: "",
     }));
+
+    if (name === "email") {
+      setShowResend(false);
+      setResendMessage("");
+    }
   }
 
   async function handleSignin(e) {
@@ -40,40 +50,96 @@ export const Login = ({ setIsLoggedIn }) => {
     }
 
     const newErrors = {};
+
     if (!formData.email.trim()) {
       newErrors.email = "Email is required";
     }
+
     if (!formData.password.trim()) {
       newErrors.password = "Password is required";
     }
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
+
     const user = {
       email: formData.email,
       password: formData.password,
     };
+
     setIsLoading(true);
+    setShowResend(false);
+    setResendMessage("");
 
     try {
       const data = await axios.post(login, user, {
         withCredentials: true,
       });
+
       const token = data.data.token;
+
       if (formData.rememberMe) {
         localStorage.setItem("token", token);
       } else {
         sessionStorage.setItem("token", token);
       }
+
       setIsLoggedIn(true);
       notifyLogin();
       navigate("/dashboard");
     } catch (error) {
-      newErrors.password = error.response?.data?.message || "Unable to sign in";
-      setErrors(newErrors);
+      const status = error.response?.status;
+      const message = error.response?.data?.message || "Unable to sign in";
+
+      if (status === 403) {
+        setShowResend(true);
+      }
+
+      setErrors((prev) => ({
+        ...prev,
+        password: message,
+      }));
+
       setIsLoading(false);
+    }
+  }
+
+  async function handleResendVerification() {
+    if (isResending) {
       return;
+    }
+
+    if (!formData.email.trim()) {
+      setErrors((prev) => ({
+        ...prev,
+        email: "Enter your email first",
+      }));
+      return;
+    }
+
+    setIsResending(true);
+    setResendMessage("");
+
+    try {
+      const response = await axios.post(
+        resendVerification,
+        {
+          email: formData.email,
+        },
+        {
+          withCredentials: true,
+        },
+      );
+
+      setResendMessage(response.data.message);
+    } catch (error) {
+      setResendMessage(
+        error.response?.data?.message || "Unable to resend verification email",
+      );
+    } finally {
+      setIsResending(false);
     }
   }
 
@@ -219,6 +285,29 @@ export const Login = ({ setIsLoggedIn }) => {
               "Sign In"
             )}
           </button>
+
+          {showResend && (
+            <div className="text-center -mt-2">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Didn't receive the verification email?
+              </p>
+
+              <button
+                type="button"
+                onClick={handleResendVerification}
+                disabled={isResending}
+                className="mt-1 text-[#c64d26] font-semibold hover:underline disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isResending ? "Sending..." : "Resend verification email"}
+              </button>
+
+              {resendMessage && (
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                  {resendMessage}
+                </p>
+              )}
+            </div>
+          )}
         </form>
 
         <div className="text-center flex justify-center gap-2 mt-5 text-sm sm:text-base">

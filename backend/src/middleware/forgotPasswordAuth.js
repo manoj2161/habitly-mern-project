@@ -15,7 +15,10 @@ export const emailToken = (req, res, next) => {
   const token = authorization.split(" ")[1];
 
   try {
-    const verification = jwt.verify(token, process.env.JWT_EMAIL_SECRET);
+    const verification = jwt.verify(
+      token,
+      process.env.JWT_PASSWORD_RESET_SECRET,
+    );
     req.userId = verification.id;
     next();
   } catch {

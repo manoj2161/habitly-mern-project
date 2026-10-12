@@ -4,13 +4,21 @@ import jwt from "jsonwebtoken";
 import { Habit } from "../models/habitModel.js";
 import { Completed } from "../models/completionModel.js";
 import "dotenv/config";
-import { generateAccessToken, generateRefreshToken } from "../utils/token.js";
-
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  generateEmailVerificationToken,
+} from "../utils/token.js";
+import {
+  sendVerificationEmail,
+  sendPasswordResetEmail,
+} from "../services/emailService.js";
 const nameRegex = /^[A-Za-z '-]+$/;
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const passwordRegex =
   /^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,64}$/;
-
+const verificationResendCooldown = new Map();
+const RESEND_COOLDOWN = 60 * 1000;
 const getRefreshCookieOptions = (req) => {
   const isSecure = req.secure;
 
@@ -40,7 +48,6 @@ const clearRefreshCookie = (req, res) => {
   res.clearCookie("refreshToken", options);
 };
 
-
 const validateName = (name) => {
   if (typeof name !== "string" || !name.trim()) return "Name is required";
   const cleanedName = name.trim();
@@ -65,37 +72,67 @@ export const registerUser = async (req, res) => {
 
   const nameError = validateName(name);
   if (nameError) {
-    return res.status(400).json({ message: nameError, isSuccess: false, errorCode: 400 });
+    return res.status(400).json({
+      message: nameError,
+      isSuccess: false,
+      errorCode: 400,
+    });
   }
 
   if (typeof email !== "string" || !email.trim()) {
-    return res.status(400).json({ message: "Email is required", isSuccess: false, errorCode: 400 });
+    return res.status(400).json({
+      message: "Email is required",
+      isSuccess: false,
+      errorCode: 400,
+    });
   }
 
   const cleanedEmail = email.trim().toLowerCase();
+
   if (!emailRegex.test(cleanedEmail)) {
-    return res.status(400).json({ message: "Invalid email format", isSuccess: false, errorCode: 400 });
+    return res.status(400).json({
+      message: "Invalid email format",
+      isSuccess: false,
+      errorCode: 400,
+    });
   }
 
   const passwordError = validatePassword(password);
+
   if (passwordError) {
-    return res.status(400).json({ message: passwordError, isSuccess: false, errorCode: 400 });
+    return res.status(400).json({
+      message: passwordError,
+      isSuccess: false,
+      errorCode: 400,
+    });
   }
 
   const user = await User.findOne({ email: cleanedEmail });
+
   if (user) {
-    return res.status(409).json({ message: "User already exists", isSuccess: false, errorCode: 409 });
+    return res.status(409).json({
+      message: "User already exists",
+      isSuccess: false,
+      errorCode: 409,
+    });
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
-  await User.create({
+
+  const newUser = await User.create({
     name: name.trim(),
     email: cleanedEmail,
     password: hashedPassword,
   });
 
-  res.status(201).json({
-    message: "User created successfully",
+  const verificationToken = generateEmailVerificationToken(newUser._id);
+
+  const verificationUrl = `${process.env.BACKEND_URL}/api/auth/user/verify-email?token=${verificationToken}`;
+
+  await sendVerificationEmail(newUser.email, newUser.name, verificationUrl);
+
+  return res.status(201).json({
+    message: "Account created successfully. Please verify your email.",
     isSuccess: true,
   });
 };
@@ -136,7 +173,13 @@ export const loginUser = async (req, res) => {
       errorCode: 401,
     });
   }
-
+  if (!user.emailVerified) {
+    return res.status(403).json({
+      message: "Please verify your email before logging in",
+      isSuccess: false,
+      errorCode: 403,
+    });
+  }
   const accessToken = generateAccessToken(user._id);
   const refreshToken = generateRefreshToken(user._id);
 
@@ -221,7 +264,9 @@ export const userDashboard = async (req, res) => {
   const data = await User.findById(id).select("name email createdAt");
 
   if (!data) {
-    return res.status(404).json({ message: "User not found", isSuccess: false, errorCode: 404 });
+    return res
+      .status(404)
+      .json({ message: "User not found", isSuccess: false, errorCode: 404 });
   }
 
   const habits = await Habit.find({ userId: id }).sort({ createdAt: -1 });
@@ -229,7 +274,12 @@ export const userDashboard = async (req, res) => {
 
   res.status(200).json({
     message: "This is user dashboard",
-    user: { id: data._id, name: data.name, email: data.email, createdAt: data.createdAt },
+    user: {
+      id: data._id,
+      name: data.name,
+      email: data.email,
+      createdAt: data.createdAt,
+    },
     habits,
     completionDays,
   });
@@ -240,7 +290,9 @@ export const updateName = async (req, res) => {
   const nameError = validateName(name);
 
   if (nameError) {
-    return res.status(400).json({ message: nameError, isSuccess: false, errorCode: 400 });
+    return res
+      .status(400)
+      .json({ message: nameError, isSuccess: false, errorCode: 400 });
   }
 
   const updatedUser = await User.findByIdAndUpdate(
@@ -250,13 +302,19 @@ export const updateName = async (req, res) => {
   );
 
   if (!updatedUser) {
-    return res.status(404).json({ message: "User not found", isSuccess: false, errorCode: 404 });
+    return res
+      .status(404)
+      .json({ message: "User not found", isSuccess: false, errorCode: 404 });
   }
 
   res.status(200).json({
     message: "Name updated successfully",
     isSuccess: true,
-    data: { id: updatedUser._id, name: updatedUser.name, email: updatedUser.email },
+    data: {
+      id: updatedUser._id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+    },
   });
 };
 
@@ -265,7 +323,9 @@ export const updatePassword = async (req, res) => {
   const passwordError = validatePassword(password);
 
   if (passwordError) {
-    return res.status(400).json({ message: passwordError, isSuccess: false, errorCode: 400 });
+    return res
+      .status(400)
+      .json({ message: passwordError, isSuccess: false, errorCode: 400 });
   }
 
   const updatedUser = await User.findByIdAndUpdate(
@@ -275,10 +335,14 @@ export const updatePassword = async (req, res) => {
   );
 
   if (!updatedUser) {
-    return res.status(404).json({ message: "User not found", isSuccess: false, errorCode: 404 });
+    return res
+      .status(404)
+      .json({ message: "User not found", isSuccess: false, errorCode: 404 });
   }
 
-  res.status(200).json({ message: "Password updated successfully", isSuccess: true });
+  res
+    .status(200)
+    .json({ message: "Password updated successfully", isSuccess: true });
 };
 
 export const deleteUser = async (req, res) => {
@@ -286,7 +350,9 @@ export const deleteUser = async (req, res) => {
   const user = await User.findById(id);
 
   if (!user) {
-    return res.status(404).json({ message: "User not found", errorCode: 404, isSuccess: false });
+    return res
+      .status(404)
+      .json({ message: "User not found", errorCode: 404, isSuccess: false });
   }
 
   await Completed.deleteMany({ userId: id });
@@ -295,49 +361,186 @@ export const deleteUser = async (req, res) => {
 
   clearRefreshCookie(req, res);
 
-  res.status(200).json({ message: "Account deleted successfully", isSuccess: true });
+  res
+    .status(200)
+    .json({ message: "Account deleted successfully", isSuccess: true });
 };
 
 export const forgotPasswordStepOne = async (req, res) => {
   const { email } = req.body || {};
 
   if (typeof email !== "string" || !email.trim()) {
-    return res.status(400).json({ message: "Email is required", isSuccess: false, errorCode: 400 });
+    return res
+      .status(400)
+      .json({ message: "Email is required", isSuccess: false, errorCode: 400 });
   }
 
   const cleanedEmail = email.trim().toLowerCase();
   const validUser = await User.findOne({ email: cleanedEmail });
 
   if (!validUser) {
-    return res.status(404).json({ message: "User not found", isSuccess: false, errorCode: 404 });
+    return res
+      .status(404)
+      .json({ message: "User not found", isSuccess: false, errorCode: 404 });
   }
 
-  const token = jwt.sign({ id: validUser._id }, process.env.JWT_EMAIL_SECRET, { expiresIn: "10m" });
+  const token = jwt.sign(
+    { id: validUser._id },
+    process.env.JWT_PASSWORD_RESET_SECRET,
+    { expiresIn: "10m" },
+  );
 
-  res.status(200).json({
-    message: "Email found successfully",
-    data: { id: validUser._id, email: validUser.email },
-    token,
+  const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+
+  await sendPasswordResetEmail(validUser.email, validUser.name, resetUrl);
+
+  return res.status(200).json({
+    message: "Password reset email sent successfully",
     isSuccess: true,
   });
 };
-
 export const forgotPasswordStepTwo = async (req, res) => {
   const { password } = req.body || {};
   const passwordError = validatePassword(password);
 
   if (passwordError) {
-    return res.status(400).json({ message: passwordError, isSuccess: false, errorCode: 400 });
+    return res
+      .status(400)
+      .json({ message: passwordError, isSuccess: false, errorCode: 400 });
   }
 
   const user = await User.findById(req.userId);
   if (!user) {
-    return res.status(404).json({ message: "User not found", isSuccess: false, errorCode: 404 });
+    return res
+      .status(404)
+      .json({ message: "User not found", isSuccess: false, errorCode: 404 });
   }
 
   await User.findByIdAndUpdate(req.userId, {
     password: await bcrypt.hash(password, 10),
   });
 
-  res.status(200).json({ message: "Password updated successfully", isSuccess: true });
+  res
+    .status(200)
+    .json({ message: "Password updated successfully", isSuccess: true });
+};
+export const verifyEmail = async (req, res) => {
+  const { token } = req.query;
+
+  if (!token) {
+    return res.status(400).json({
+      message: "Email verification token is missing",
+      isSuccess: false,
+      errorCode: 400,
+    });
+  }
+
+  try {
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_EMAIL_VERIFICATION_SECRET,
+    );
+
+    const userId = decoded.id;
+
+    if (!userId) {
+      return res.status(400).json({
+        message: "Invalid email verification token",
+        isSuccess: false,
+        errorCode: 400,
+      });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+        isSuccess: false,
+        errorCode: 404,
+      });
+    }
+
+    if (user.emailVerified) {
+      return res.redirect(`${process.env.FRONTEND_URL}/email-verified`);
+    }
+
+    user.emailVerified = true;
+    await user.save();
+
+    return res.redirect(`${process.env.FRONTEND_URL}/email-verified`);
+  } catch (error) {
+    return res.status(400).json({
+      message: "Invalid or expired email verification token",
+      isSuccess: false,
+      errorCode: 400,
+    });
+  }
+};
+export const resendVerificationEmail = async (req, res) => {
+  const { email } = req.body || {};
+
+  if (typeof email !== "string" || !email.trim()) {
+    return res.status(400).json({
+      message: "Email is required",
+      isSuccess: false,
+      errorCode: 400,
+    });
+  }
+
+  const cleanedEmail = email.trim().toLowerCase();
+
+  if (!emailRegex.test(cleanedEmail)) {
+    return res.status(400).json({
+      message: "Invalid email format",
+      isSuccess: false,
+      errorCode: 400,
+    });
+  }
+
+  const user = await User.findOne({ email: cleanedEmail });
+
+  if (!user) {
+    return res.status(200).json({
+      message:
+        "If an account exists with this email, a verification email has been sent.",
+      isSuccess: true,
+    });
+  }
+
+  if (user.emailVerified) {
+    return res.status(200).json({
+      message: "Email is already verified. You can log in.",
+      isSuccess: true,
+    });
+  }
+
+  const lastSentAt = verificationResendCooldown.get(cleanedEmail);
+  const now = Date.now();
+
+  if (lastSentAt && now - lastSentAt < RESEND_COOLDOWN) {
+    const remainingSeconds = Math.ceil(
+      (RESEND_COOLDOWN - (now - lastSentAt)) / 1000,
+    );
+
+    return res.status(429).json({
+      message: `Please wait ${remainingSeconds} seconds before requesting another verification email.`,
+      isSuccess: false,
+      errorCode: 429,
+    });
+  }
+
+  const verificationToken = generateEmailVerificationToken(user._id);
+
+  const verificationUrl = `${process.env.BACKEND_URL}/api/auth/user/verify-email?token=${verificationToken}`;
+
+  await sendVerificationEmail(user.email, user.name, verificationUrl);
+
+  verificationResendCooldown.set(cleanedEmail, now);
+
+  return res.status(200).json({
+    message:
+      "If an account exists with this email, a verification email has been sent.",
+    isSuccess: true,
+  });
 };

@@ -12,3 +12,8 @@ export const generateRefreshToken = (userId) => {
     expiresIn: "7d",
   });
 };
+export const generateEmailVerificationToken = (userId) => {
+  return jwt.sign({ id: userId }, process.env.JWT_EMAIL_VERIFICATION_SECRET, {
+    expiresIn: "30m",
+  });
+};

@@ -10,6 +10,8 @@ import {
   deleteUser,
   forgotPasswordStepOne,
   forgotPasswordStepTwo,
+  verifyEmail,
+  resendVerificationEmail,
 } from "../controllers/userControllers.js";
 import { authToken } from "../middleware/auth.js";
 import { emailToken } from "../middleware/forgotPasswordAuth.js";
@@ -24,4 +26,6 @@ router.put("/dashboard/profile/password", authToken, updatePassword);
 router.delete("/dashboard/profile/delete", authToken, deleteUser);
 router.post("/forgot-password/email", forgotPasswordStepOne);
 router.put("/forgot-password/reset", emailToken, forgotPasswordStepTwo);
+router.get("/verify-email", verifyEmail);
+router.post("/resend-verification", resendVerificationEmail);
 export default router;
