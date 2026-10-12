@@ -11,7 +11,12 @@ dns.setServers(["8.8.8.8", "8.8.4.4"]);
 
 const app = express();
 
-app.use(cors());
+app.use(
+  cors({
+    origin: "https://habitlyx.vercel.app",
+    credentials: true,
+  }),
+);
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
