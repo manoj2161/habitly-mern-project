@@ -40,21 +40,15 @@ function App() {
     <>
       <PageLoader />
       <OfflineBanner />
-
       <Routes>
         <Route path="/" element={<Login setIsLoggedIn={setIsLoggedIn} />} />
-
         <Route
           path="/signup"
           element={<SignUp setIsLoggedIn={setIsLoggedIn} />}
         />
-
         <Route path="/forgot-password" element={<ForgotPassword />} />
-
         <Route path="/reset-password" element={<ResetPassword />} />
-
         <Route path="/email-verified" element={<EmailVerified />} />
-
         <Route
           path="/dashboard"
           element={
@@ -63,7 +57,6 @@ function App() {
             </ProtectedRoute>
           }
         />
-
         <Route
           path="/myhabits"
           element={
@@ -72,7 +65,6 @@ function App() {
             </ProtectedRoute>
           }
         />
-
         <Route
           path="/calender"
           element={

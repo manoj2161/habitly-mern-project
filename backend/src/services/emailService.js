@@ -1,16 +1,30 @@
-import { Resend } from "resend";
+import { BrevoClient } from "@getbrevo/brevo";
 import "dotenv/config";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const brevo = new BrevoClient({
+  apiKey: process.env.BREVO_API_KEY,
+});
+
+const sender = {
+  name: "Habitly",
+  email: process.env.EMAIL_FROM,
+};
 
 export const sendVerificationEmail = async (email, name, verificationUrl) => {
-  const { data, error } = await resend.emails.send({
-    from: process.env.EMAIL_FROM,
-    to: [email],
+  const result = await brevo.transactionalEmails.sendTransacEmail({
+    sender,
+    to: [
+      {
+        email,
+        name,
+      },
+    ],
     subject: "Verify your Habitly email",
-    html: `
+    htmlContent: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 30px;">
-        <h1 style="color: #f97316;">Welcome to Habitly, ${name}!</h1>
+        <h1 style="color: #f97316;">
+          Welcome to Habitly, ${name}!
+        </h1>
 
         <p>
           Thanks for creating your Habitly account.
@@ -52,20 +66,24 @@ export const sendVerificationEmail = async (email, name, verificationUrl) => {
     `,
   });
 
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return data;
+  return result;
 };
+
 export const sendPasswordResetEmail = async (email, name, resetUrl) => {
-  const { data, error } = await resend.emails.send({
-    from: process.env.EMAIL_FROM,
-    to: [email],
+  const result = await brevo.transactionalEmails.sendTransacEmail({
+    sender,
+    to: [
+      {
+        email,
+        name,
+      },
+    ],
     subject: "Reset your Habitly password",
-    html: `
+    htmlContent: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 30px;">
-        <h1 style="color: #f97316;">Reset your Habitly password</h1>
+        <h1 style="color: #f97316;">
+          Reset your Habitly password
+        </h1>
 
         <p>
           Hi ${name},
@@ -111,9 +129,5 @@ export const sendPasswordResetEmail = async (email, name, resetUrl) => {
     `,
   });
 
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return data;
+  return result;
 };
