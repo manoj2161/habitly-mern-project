@@ -1,9 +1,17 @@
 import girlImage from "../assets/girlImage.png";
 import { useNavigate } from "react-router-dom";
-import { Mail, Lock, EyeClosed, UserRound, Eye, Loader2 } from "lucide-react";
+import {
+  Mail,
+  Lock,
+  EyeClosed,
+  UserRound,
+  Eye,
+  Loader2,
+} from "lucide-react";
 import { useState } from "react";
 import axios from "axios";
 import { register } from "../api/endpoints";
+
 export const SignUp = () => {
   const [formData, setFormData] = useState({
     name: "",
@@ -13,6 +21,7 @@ export const SignUp = () => {
   });
 
   const [errors, setErrors] = useState({});
+  const [successMessage, setSuccessMessage] = useState("");
   const [show, setShow] = useState(false);
   const [cshow, setCShow] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -31,6 +40,8 @@ export const SignUp = () => {
       ...prev,
       [name]: "",
     }));
+
+    setSuccessMessage("");
   }
 
   async function handleSignup(e) {
@@ -49,9 +60,10 @@ export const SignUp = () => {
 
     if (!formData.email.trim()) {
       newErrors.email = "Email is required";
-    } else if (!emailRegex.test(formData.email)) {
+    } else if (!emailRegex.test(formData.email.trim())) {
       newErrors.email = "Please enter a valid email";
     }
+
     if (!formData.password.trim()) {
       newErrors.password = "Password is required";
     } else {
@@ -63,6 +75,7 @@ export const SignUp = () => {
           "Password must be 8–64 characters and contain uppercase, lowercase, number, and special character";
       }
     }
+
     if (!formData.cpassword.trim()) {
       newErrors.cpassword = "Confirm Password is required";
     } else if (formData.password !== formData.cpassword) {
@@ -73,24 +86,43 @@ export const SignUp = () => {
       setErrors(newErrors);
       return;
     }
+
     const newUser = {
       name: formData.name.trim(),
       email: formData.email.trim().toLowerCase(),
       password: formData.password,
     };
+
     setIsLoading(true);
+    setErrors({});
+    setSuccessMessage("");
 
     try {
-      const userData = await axios.post(register, newUser, {
+      const response = await axios.post(register, newUser, {
         withCredentials: true,
       });
-      console.log(userData);
-      navigate("/");
+
+      console.log(response.data);
+
+      setSuccessMessage(
+        response.data?.message ||
+          "Account created successfully. Please verify your email.",
+      );
+
+      setFormData({
+        name: "",
+        email: "",
+        password: "",
+        cpassword: "",
+      });
     } catch (error) {
-      newErrors.email = error.response?.data?.message || "Unable to create account";
-      setErrors(newErrors);
+      setErrors({
+        email:
+          error.response?.data?.message ||
+          "Unable to create account. Please try again.",
+      });
+    } finally {
       setIsLoading(false);
-      return;
     }
   }
 
@@ -125,173 +157,198 @@ export const SignUp = () => {
           <p className="text-[#c64d26] mt-2">Let's get you started!</p>
         </div>
 
-        <form
-          onSubmit={handleSignup}
-          className="flex flex-col gap-5 px-2 sm:px-6 mt-5"
-        >
-          <div className="relative">
-            <label
-              htmlFor="name"
-              className="block text-sm sm:text-base font-semibold mb-2"
+        {successMessage && (
+          <div className="mx-2 sm:mx-6 mt-5 rounded-md border border-green-300 bg-green-50 dark:bg-green-950 dark:border-green-800 px-4 py-3 text-sm text-green-700 dark:text-green-300">
+            <p className="font-semibold">Account created successfully!</p>
+            <p className="mt-1">{successMessage}</p>
+            <p className="mt-2">
+              Please check your email and click the verification link before
+              signing in.
+            </p>
+
+            <button
+              type="button"
+              onClick={() => navigate("/")}
+              className="mt-3 font-semibold text-green-800 dark:text-green-400 underline"
             >
-              Full Name
-              <span className="text-red-500 ml-1">*</span>
-            </label>
-
-            <div className="relative">
-              <UserRound className="absolute left-3 top-1/2 -translate-y-1/2 text-[#FDC8A0] z-10 size-5" />
-
-              <input
-                type="text"
-                name="name"
-                id="name"
-                placeholder="Enter your Full Name"
-                value={formData.name}
-                onChange={handleChange}
-                className="rounded-md border-2 border-[#FDC8A0] focus:outline-none focus:border-[#c64d26] bg-transparent dark:bg-gray-900 w-full h-11 pl-10 pr-3"
-              />
-            </div>
-
-            {errors.name && (
-              <p className="text-sm text-red-500 mt-1">{errors.name}</p>
-            )}
+              Go to Sign In
+            </button>
           </div>
+        )}
 
-          <div className="relative">
-            <label
-              htmlFor="email"
-              className="block text-sm sm:text-base font-semibold mb-2"
-            >
-              Email
-              <span className="text-red-500 ml-1">*</span>
-            </label>
-
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-[#FDC8A0] z-10 size-5" />
-
-              <input
-                type="email"
-                name="email"
-                id="email"
-                placeholder="Enter your email"
-                value={formData.email}
-                onChange={handleChange}
-                className="rounded-md border-2 border-[#FDC8A0] focus:outline-none focus:border-[#c64d26] bg-transparent dark:bg-gray-900 w-full h-11 pl-10 pr-3"
-              />
-            </div>
-
-            {errors.email && (
-              <p className="text-sm text-red-500 mt-1">{errors.email}</p>
-            )}
-          </div>
-
-          <div className="relative">
-            <label
-              htmlFor="password"
-              className="block text-sm sm:text-base font-semibold mb-2"
-            >
-              Password
-              <span className="text-red-500 ml-1">*</span>
-            </label>
-
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-[#FDC8A0] z-10 size-5" />
-
-              {show ? (
-                <EyeClosed
-                  onClick={() => setShow(false)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#FDC8A0] z-10 cursor-pointer size-5"
-                />
-              ) : (
-                <Eye
-                  onClick={() => setShow(true)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#FDC8A0] z-10 cursor-pointer size-5"
-                />
-              )}
-
-              <input
-                type={show ? "text" : "password"}
-                name="password"
-                id="password"
-                placeholder="Create your password"
-                value={formData.password}
-                onChange={handleChange}
-                className="rounded-md border-2 border-[#FDC8A0] focus:outline-none focus:border-[#c64d26] bg-transparent dark:bg-gray-900 w-full h-11 pl-10 pr-10"
-              />
-            </div>
-
-            {errors.password && (
-              <p className="text-sm text-red-500 mt-1">{errors.password}</p>
-            )}
-          </div>
-
-          <div className="relative">
-            <label
-              htmlFor="cpassword"
-              className="block text-sm sm:text-base font-semibold mb-2"
-            >
-              Confirm Password
-              <span className="text-red-500 ml-1">*</span>
-            </label>
-
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-[#FDC8A0] z-10 size-5" />
-
-              {cshow ? (
-                <EyeClosed
-                  onClick={() => setCShow(false)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#FDC8A0] z-10 cursor-pointer size-5"
-                />
-              ) : (
-                <Eye
-                  onClick={() => setCShow(true)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#FDC8A0] z-10 cursor-pointer size-5"
-                />
-              )}
-
-              <input
-                type={cshow ? "text" : "password"}
-                name="cpassword"
-                id="cpassword"
-                placeholder="Confirm your password"
-                value={formData.cpassword}
-                onChange={handleChange}
-                className="rounded-md border-2 border-[#FDC8A0] focus:outline-none focus:border-[#c64d26] bg-transparent dark:bg-gray-900 w-full h-11 pl-10 pr-10"
-              />
-            </div>
-
-            {errors.cpassword && (
-              <p className="text-sm text-red-500 mt-1">{errors.cpassword}</p>
-            )}
-          </div>
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="bg-[#c64d26] hover:bg-[#ad401e] rounded-md h-11 text-white text-base sm:text-lg font-semibold transition disabled:cursor-not-allowed disabled:opacity-70 flex items-center justify-center gap-2"
+        {!successMessage && (
+          <form
+            onSubmit={handleSignup}
+            className="flex flex-col gap-5 px-2 sm:px-6 mt-5"
           >
-            {isLoading ? (
-              <>
-                <Loader2 size={20} className="animate-spin" />
-                Creating Account...
-              </>
-            ) : (
-              "Sign Up"
-            )}
-          </button>
-        </form>
+            <div className="relative">
+              <label
+                htmlFor="name"
+                className="block text-sm sm:text-base font-semibold mb-2"
+              >
+                Full Name
+                <span className="text-red-500 ml-1">*</span>
+              </label>
 
-        <div className="text-center flex justify-center gap-2 mt-5 text-sm sm:text-base">
-          <span>Already have an account?</span>
+              <div className="relative">
+                <UserRound className="absolute left-3 top-1/2 -translate-y-1/2 text-[#FDC8A0] z-10 size-5" />
 
-          <button
-            type="button"
-            onClick={() => navigate("/")}
-            className="text-green-800 dark:text-green-400 font-semibold"
-          >
-            Sign In
-          </button>
-        </div>
+                <input
+                  type="text"
+                  name="name"
+                  id="name"
+                  placeholder="Enter your Full Name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  className="rounded-md border-2 border-[#FDC8A0] focus:outline-none focus:border-[#c64d26] bg-transparent dark:bg-gray-900 w-full h-11 pl-10 pr-3"
+                />
+              </div>
+
+              {errors.name && (
+                <p className="text-sm text-red-500 mt-1">{errors.name}</p>
+              )}
+            </div>
+
+            <div className="relative">
+              <label
+                htmlFor="email"
+                className="block text-sm sm:text-base font-semibold mb-2"
+              >
+                Email
+                <span className="text-red-500 ml-1">*</span>
+              </label>
+
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-[#FDC8A0] z-10 size-5" />
+
+                <input
+                  type="email"
+                  name="email"
+                  id="email"
+                  placeholder="Enter your email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="rounded-md border-2 border-[#FDC8A0] focus:outline-none focus:border-[#c64d26] bg-transparent dark:bg-gray-900 w-full h-11 pl-10 pr-3"
+                />
+              </div>
+
+              {errors.email && (
+                <p className="text-sm text-red-500 mt-1">{errors.email}</p>
+              )}
+            </div>
+
+            <div className="relative">
+              <label
+                htmlFor="password"
+                className="block text-sm sm:text-base font-semibold mb-2"
+              >
+                Password
+                <span className="text-red-500 ml-1">*</span>
+              </label>
+
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-[#FDC8A0] z-10 size-5" />
+
+                {show ? (
+                  <EyeClosed
+                    onClick={() => setShow(false)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#FDC8A0] z-10 cursor-pointer size-5"
+                  />
+                ) : (
+                  <Eye
+                    onClick={() => setShow(true)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#FDC8A0] z-10 cursor-pointer size-5"
+                  />
+                )}
+
+                <input
+                  type={show ? "text" : "password"}
+                  name="password"
+                  id="password"
+                  placeholder="Create your password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  className="rounded-md border-2 border-[#FDC8A0] focus:outline-none focus:border-[#c64d26] bg-transparent dark:bg-gray-900 w-full h-11 pl-10 pr-10"
+                />
+              </div>
+
+              {errors.password && (
+                <p className="text-sm text-red-500 mt-1">{errors.password}</p>
+              )}
+            </div>
+
+            <div className="relative">
+              <label
+                htmlFor="cpassword"
+                className="block text-sm sm:text-base font-semibold mb-2"
+              >
+                Confirm Password
+                <span className="text-red-500 ml-1">*</span>
+              </label>
+
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-[#FDC8A0] z-10 size-5" />
+
+                {cshow ? (
+                  <EyeClosed
+                    onClick={() => setCShow(false)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#FDC8A0] z-10 cursor-pointer size-5"
+                  />
+                ) : (
+                  <Eye
+                    onClick={() => setCShow(true)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#FDC8A0] z-10 cursor-pointer size-5"
+                  />
+                )}
+
+                <input
+                  type={cshow ? "text" : "password"}
+                  name="cpassword"
+                  id="cpassword"
+                  placeholder="Confirm your password"
+                  value={formData.cpassword}
+                  onChange={handleChange}
+                  className="rounded-md border-2 border-[#FDC8A0] focus:outline-none focus:border-[#c64d26] bg-transparent dark:bg-gray-900 w-full h-11 pl-10 pr-10"
+                />
+              </div>
+
+              {errors.cpassword && (
+                <p className="text-sm text-red-500 mt-1">
+                  {errors.cpassword}
+                </p>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="bg-[#c64d26] hover:bg-[#ad401e] rounded-md h-11 text-white text-base sm:text-lg font-semibold transition disabled:cursor-not-allowed disabled:opacity-70 flex items-center justify-center gap-2"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 size={20} className="animate-spin" />
+                  Creating Account...
+                </>
+              ) : (
+                "Sign Up"
+              )}
+            </button>
+          </form>
+        )}
+
+        {!successMessage && (
+          <div className="text-center flex justify-center gap-2 mt-5 text-sm sm:text-base">
+            <span>Already have an account?</span>
+
+            <button
+              type="button"
+              onClick={() => navigate("/")}
+              className="text-green-800 dark:text-green-400 font-semibold"
+            >
+              Sign In
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
